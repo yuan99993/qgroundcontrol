@@ -50,7 +50,13 @@ Map {
     }
 
     function centerToSpecifiedLocation() {
-        specifyMapPositionDialog.createObject(mainWindow).open()
+        specifyMapPositionDialogFactory.open()
+    }
+
+    QGCPopupDialogFactory {
+        id: specifyMapPositionDialogFactory
+
+        dialogComponent: specifyMapPositionDialog
     }
 
     Component {
@@ -242,3 +248,5 @@ Map {
         }
     }
 } // Map
+
+

@@ -10,6 +10,7 @@ import QGroundControl.Controls
 import QGroundControl.FlyView
 import QGroundControl.FlightMap
 
+
 FlightMap {
     id:                         _root
     allowGCSLocationCenter:     true
@@ -608,6 +609,12 @@ FlightMap {
         }
     }
 
+    QGCPopupDialogFactory {
+        id: roiEditPositionDialogFactory
+
+        dialogComponent: roiEditPositionDialogComponent
+    }
+
     Component {
         id: roiEditPositionDialogComponent
 
@@ -644,7 +651,7 @@ FlightMap {
                         Layout.fillWidth:   true
                         text:               qsTr("Edit Position")
                         onClicked: {
-                            roiEditPositionDialogComponent.createObject(mainWindow, { showSetPositionFromVehicle: false }).open()
+                            roiEditPositionDialogFactory.open({ showSetPositionFromVehicle: false })
                             roiEditDropPanel.close()
                         }
                     }
@@ -743,20 +750,20 @@ FlightMap {
         }
     }
 
-    onMapClicked: (position) => {
-        if (!globals.guidedControllerFlyView.guidedUIVisible &&
-            (globals.guidedControllerFlyView.showGotoLocation || globals.guidedControllerFlyView.showOrbit ||
-             globals.guidedControllerFlyView.showROI || globals.guidedControllerFlyView.showSetHome ||
-             globals.guidedControllerFlyView.showSetEstimatorOrigin)) {
+    // onMapClicked: (position) => {
+    //     if (!globals.guidedControllerFlyView.guidedUIVisible &&
+    //         (globals.guidedControllerFlyView.showGotoLocation || globals.guidedControllerFlyView.showOrbit ||
+    //          globals.guidedControllerFlyView.showROI || globals.guidedControllerFlyView.showSetHome ||
+    //          globals.guidedControllerFlyView.showSetEstimatorOrigin)) {
 
-            position = Qt.point(position.x, position.y)
-            var clickCoord = _root.toCoordinate(position, false /* clipToViewPort */)
-            // For some strange reason using mainWindow in mapToItem doesn't work, so we use globals.parent instead which also gets us mainWindow
-            position = _root.mapToItem(globals.parent, position)
-            var dropPanel = mapClickDropPanelComponent.createObject(mainWindow, { mapClickCoord: clickCoord, clickRect: Qt.rect(position.x, position.y, 0, 0) })
-            dropPanel.open()
-        }
-    }
+    //         position = Qt.point(position.x, position.y)
+    //         var clickCoord = _root.toCoordinate(position, false /* clipToViewPort */)
+    //         // For some strange reason using mainWindow in mapToItem doesn't work, so we use globals.parent instead which also gets us mainWindow
+    //         position = _root.mapToItem(globals.parent, position)
+    //         var dropPanel = mapClickDropPanelComponent.createObject(mainWindow, { mapClickCoord: clickCoord, clickRect: Qt.rect(position.x, position.y, 0, 0) })
+    //         dropPanel.open()
+    //     }
+    // }
 
     MapScale {
         id:                 mapScale
@@ -769,4 +776,111 @@ FlightMap {
         property real centerInset: visible ? parent.height - y : 0
     }
 
+    // 判断是否在Fly页面
+    property bool _isPrimaryFlyMap: mapName === "FlightDisplayView" && !pipMode && globals.isFlyPageActive
+    // 左键点击保留为空，或根据需要添加逻辑
+    onMapClicked: (position) => {
+        // 首先执行 QGC 原生的左键逻辑
+        if (!globals.guidedControllerFlyView.guidedUIVisible &&
+            (globals.guidedControllerFlyView.showGotoLocation || globals.guidedControllerFlyView.showOrbit ||
+             globals.guidedControllerFlyView.showROI || globals.guidedControllerFlyView.showSetHome ||
+             globals.guidedControllerFlyView.showSetEstimatorOrigin)) {
+
+            var pos = Qt.point(position.x, position.y)
+            var clickCoord = _root.toCoordinate(pos, false)
+            pos = _root.mapToItem(globals.parent, pos)
+            var dropPanel = mapClickDropPanelComponent.createObject(mainWindow, { mapClickCoord: clickCoord, clickRect: Qt.rect(pos.x, pos.y, 0, 0) })
+            dropPanel.open()
+        }
+    }
+
+    onMapRightClicked: (position) => {
+        // 只有在飞行主地图且非小窗口时才弹出 SEAD 菜单
+        if (_isPrimaryFlyMap) {
+            var coordinate = _root.toCoordinate(position, false)
+            seadContextMenu.clickCoordinate = coordinate
+            seadContextMenu.popup()
+        }
+    }
+
+    onMapPressAndHold: (position) => {
+        if (_isPrimaryFlyMap) {
+            var coordinate = _root.toCoordinate(position, false)
+            seadContextMenu.clickCoordinate = coordinate
+            seadContextMenu.popup()
+        }
+    }
+
+    QGCMenu {
+        id: seadContextMenu
+        property var clickCoordinate
+
+        background: Rectangle {
+            implicitWidth:  ScreenTools.defaultFontPixelWidth * 15
+            color:          "#4DF5F5F5" // 浅灰 + 约30%不透明度
+            border.color:   "#BCBCBC"
+            radius:         4
+        }
+
+        QGCMenuItem {
+            text: "插入 SEAD 任务点"
+            onTriggered: SeadManager.addSeadPoint(seadContextMenu.clickCoordinate)
+        }
+        QGCMenuItem {
+            text: "中途插入任务点"
+            onTriggered: SeadManager.insertTask(seadContextMenu.clickCoordinate)
+        }
+        QGCMenuItem {
+            text: "增加禁飞区顶点"
+            onTriggered: SeadManager.addZoneVertex(seadContextMenu.clickCoordinate)
+        }
+        QGCMenuSeparator { }
+        QGCMenuItem {
+            text: "清除所有点位"
+            onTriggered: SeadManager.clearAll()
+        }
+    }
+
+    // src/FlyView/FlyViewMap.qml
+
+    // --- 1. SEAD 初始任务点 (黄色) ---
+    MapItemView {
+        model: SeadManager.missionPoints
+        delegate: MapQuickItem {
+            coordinate:     object.coordinate
+            anchorPoint:    Qt.point(sourceItem.width/2, sourceItem.height/2)
+            z:              QGroundControl.zOrderMapItems
+            sourceItem: Rectangle {
+                width: 14; height: 14; color: "yellow"; radius: 7; border.color: "black"
+                QGCLabel { text: "S"; anchors.centerIn: parent; font.pixelSize: 10; color: "black" }
+            }
+        }
+    }
+
+    // --- 2. 中途插入点 (浅蓝色) ---
+    MapItemView {
+        model: SeadManager.insertPoints
+        delegate: MapQuickItem {
+            coordinate:     object.coordinate
+            anchorPoint:    Qt.point(sourceItem.width/2, sourceItem.height/2)
+            z:              QGroundControl.zOrderMapItems
+            sourceItem: Rectangle {
+                width: 14; height: 14; color: "lightblue"; radius: 7; border.color: "black"
+                QGCLabel { text: "I"; anchors.centerIn: parent; font.pixelSize: 10; color: "black" }
+            }
+        }
+    }
+
+    // --- 3. 禁飞区边界点 (红色) ---
+    MapItemView {
+        model: SeadManager.zonePoints
+        delegate: MapQuickItem {
+            coordinate:     object.coordinate
+            anchorPoint:    Qt.point(sourceItem.width/2, sourceItem.height/2)
+            z:              QGroundControl.zOrderMapItems
+            sourceItem: Rectangle {
+                width: 12; height: 12; color: "red"; radius: 6; border.color: "white"
+            }
+        }
+    }
 }

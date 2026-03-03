@@ -19,8 +19,6 @@ ApplicationWindow {
     // The special casing for android prevents white bars from showing up on the edges of the screen with newer android versions
     flags:      Qt.Window | (ScreenTools.isAndroid ? Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint : 0)
 
-    property bool   _utmspSendActTrigger
-
     Component.onCompleted: {
         // Start the sequence of first run prompt(s)
         firstRunPromptManager.nextPrompt()
@@ -71,6 +69,9 @@ ApplicationWindow {
         readonly property real      defaultTextWidth:               ScreenTools.defaultFontPixelWidth
         readonly property var       planMasterControllerFlyView:    flyView.planController
         readonly property var       guidedControllerFlyView:        flyView.guidedController
+
+        //新增，用于判断是否在Fly页面，在Fly页面才能右键打开插点菜单
+        readonly property bool      isFlyPageActive:                flyView.visible && !planView.visible && !toolDrawer.visible
 
         // Number of QGCTextField's with validation errors. Used to prevent closing panels with validation errors.
         property int                validationErrorCount:           0
@@ -155,13 +156,22 @@ ApplicationWindow {
     //-------------------------------------------------------------------------
     //-- Global simple message dialog
 
-    function showMessageDialog(dialogTitle, dialogText, buttons = Dialog.Ok, acceptFunction = null, closeFunction = null) {
-        simpleMessageDialogComponent.createObject(mainWindow, { title: dialogTitle, text: dialogText, buttons: buttons, acceptFunction: acceptFunction, closeFunction: closeFunction }).open()
+    function _showMessageDialogWorker(owner, dialogTitle, dialogText, buttons = Dialog.Ok, acceptFunction = null, closeFunction = null) {
+        let dialog = simpleMessageDialogComponent.createObject(owner, { title: dialogTitle, text: dialogText, buttons: buttons, acceptFunction: acceptFunction, closeFunction: closeFunction })
+        dialog.open()
     }
 
     // This variant is only meant to be called by QGCApplication
     function _showMessageDialog(dialogTitle, dialogText) {
-        showMessageDialog(dialogTitle, dialogText)
+        _showMessageDialogWorker(mainWindow, dialogTitle, dialogText)
+    }
+
+    Connections {
+        target: QGroundControl
+
+        function onShowMessageDialogRequested(owner, title, text, buttons, acceptFunction, closeFunction) {
+            _showMessageDialogWorker(owner, title, text, buttons, acceptFunction, closeFunction)
+        }
     }
 
     Component {
@@ -206,9 +216,9 @@ ApplicationWindow {
     property string closeDialogTitle: qsTr("Close %1").arg(QGroundControl.appName)
 
     function checkForUnsavedMission() {
-        if (planView._planMasterController.dirty) {
-            showMessageDialog(closeDialogTitle,
-                              qsTr("You have a mission edit in progress which has not been saved/sent. If you close you will lose changes. Are you sure you want to close?"),
+        if (planView._planMasterController.dirtyForSave || planView._planMasterController.dirtyForUpload) {
+            QGroundControl.showMessageDialog(mainWindow, closeDialogTitle,
+                              qsTr("You have a mission edit in progress which has not been saved/uploaded. If you close you will lose changes. Are you sure you want to close?"),
                               Dialog.Yes | Dialog.No,
                               function() { _closeChecksToSkip |= _skipUnsavedMissionCheckMask; performCloseChecks() })
             return false
@@ -220,7 +230,7 @@ ApplicationWindow {
     function checkForPendingParameterWrites() {
         for (var index=0; index<QGroundControl.multiVehicleManager.vehicles.count; index++) {
             if (QGroundControl.multiVehicleManager.vehicles.get(index).parameterManager.pendingWrites) {
-                mainWindow.showMessageDialog(closeDialogTitle,
+                QGroundControl.showMessageDialog(mainWindow, closeDialogTitle,
                     qsTr("You have pending parameter updates to a vehicle. If you close you will lose changes. Are you sure you want to close?"),
                     Dialog.Yes | Dialog.No,
                     function() { _closeChecksToSkip |= _skipPendingParameterWritesCheckMask; performCloseChecks() })
@@ -232,7 +242,7 @@ ApplicationWindow {
 
     function checkForActiveConnections() {
         if (QGroundControl.multiVehicleManager.activeVehicle) {
-            mainWindow.showMessageDialog(closeDialogTitle,
+            QGroundControl.showMessageDialog(mainWindow, closeDialogTitle,
                 qsTr("There are still active connections to vehicles. Are you sure you want to exit?"),
                 Dialog.Yes | Dialog.No,
                 function() { _closeChecksToSkip |= _skipActiveConnectionsCheckMask; performCloseChecks() })
@@ -556,7 +566,7 @@ ApplicationWindow {
                 radius:                     width / 2
                 color:                      QGroundControl.globalPalette.button
                 border.color:               QGroundControl.globalPalette.buttonText
-                visible:                    indicatorDrawerLoader.item && indicatorDrawerLoader.item.showExpand && !indicatorDrawer._expanded
+                visible:                    indicatorDrawerLoader.item && indicatorDrawerLoader.item._showExpand && !indicatorDrawer._expanded
 
                 QGCLabel {
                     anchors.centerIn:   parent
@@ -633,4 +643,61 @@ ApplicationWindow {
             }
         }
     }
+
+    // [自定义] Xbee 控制入口 (悬浮按钮 - 修正版)
+        // ==============================================================
+
+        // 1. 引入你的弹窗文件
+        Loader {
+            id: xbeeWindowLoader
+            source: "qrc:/qml/QGroundControl/CustomXbee/XbeeWindow.qml"
+            active: false
+
+            onLoaded: {
+                item.visible = true
+                item.raise()
+            }
+
+            Connections {
+                target: xbeeWindowLoader.item
+                function onClosing() { xbeeWindowLoader.active = false }
+                ignoreUnknownSignals: true
+            }
+        }
+
+        // 2. 在屏幕【右上角】画一个绿色按钮
+        Rectangle {
+            id: xbeeFloatingBtn
+            width: 100
+            height: 30
+            radius: 4
+            color: "#b2d732" // QGC 绿
+            z: 9999
+
+            // --- 修复点：位置改到右上角 ---
+            anchors.right: parent.right  // 靠右对齐
+            anchors.top: parent.top      // 靠顶对齐
+            anchors.rightMargin: 40     // 向左留出 150 像素（避开最小化/关闭按钮）
+            anchors.topMargin: 13         // 向下留出 5 像素
+
+            // 按钮文字
+            Text {
+                anchors.centerIn: parent
+                text: "XBEE"
+                font.bold: true
+                font.pixelSize: 12
+                color: "black"
+            }
+
+            // 点击事件
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    console.log("Opening Xbee Window...")
+                    xbeeWindowLoader.active = true
+                }
+            }
+        }
+        // ==============================================================
 }

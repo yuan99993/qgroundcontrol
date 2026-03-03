@@ -1,4 +1,5 @@
 #include "QGCApplication.h"
+#include "qgc_version.h"
 
 #include <QtCore/QEvent>
 #include <QtCore/QFile>
@@ -40,6 +41,11 @@
 #include "VehicleComponent.h"
 #include "VideoManager.h"
 
+
+//相关文件
+#include "CustomXbee/MissionControl.h" // 引用你的新类
+#include "CustomXbee/SeadBackend.h"
+
 #ifndef QGC_NO_SERIAL_LINK
 #include "SerialLink.h"
 #endif
@@ -73,7 +79,12 @@ QGCApplication::QGCApplication(int &argc, char *argv[], const QGCCommandLinePars
     if (_runningUnitTests || _simpleBootTest) {
         // We don't want unit tests to use the same QSettings space as the normal app. So we tweak the app
         // name. Also we want to run unit tests with clean settings every time.
-        applicationName = QStringLiteral("%1_unittest").arg(QGC_APP_NAME);
+        // Include test name or PID to prevent settings file conflicts when tests run in parallel
+        if (!cli.unitTests.isEmpty()) {
+            applicationName = QStringLiteral("%1_unittest_%2").arg(QGC_APP_NAME, cli.unitTests.first());
+        } else {
+            applicationName = QStringLiteral("%1_unittest_%2").arg(QGC_APP_NAME).arg(QCoreApplication::applicationPid());
+        }
     } else {
 #ifdef QGC_DAILY_BUILD
         // This gives daily builds their own separate settings space. Allowing you to use daily and stable builds
@@ -250,6 +261,13 @@ void QGCApplication::_initForNormalAppBoot()
     MultiVehicleManager::instance()->init();
     _qmlAppEngine = QGCCorePlugin::instance()->createQmlApplicationEngine(this);
     QObject::connect(_qmlAppEngine, &QQmlApplicationEngine::objectCreationFailed, this, QCoreApplication::quit, Qt::QueuedConnection);
+
+    // 新代码
+    MissionControl* missionControl = new MissionControl(this);
+    _qmlAppEngine->rootContext()->setContextProperty("MissionControl", missionControl);
+    SeadBackend* seadBackend = new SeadBackend(missionControl, this);
+    _qmlAppEngine->rootContext()->setContextProperty("SeadManager", seadBackend);
+
     QGCCorePlugin::instance()->createRootWindow(_qmlAppEngine);
 
     AudioOutput::instance()->init(SettingsManager::instance()->appSettings()->audioMuted());
@@ -473,16 +491,17 @@ void QGCApplication::_checkForNewVersion()
     const QString versionCheckFile = QGCCorePlugin::instance()->stableVersionCheckFileUrl();
     if (!versionCheckFile.isEmpty()) {
         QGCFileDownload *const download = new QGCFileDownload(this);
-        (void) connect(download, &QGCFileDownload::downloadComplete, this, &QGCApplication::_qgcCurrentStableVersionDownloadComplete);
-        download->download(versionCheckFile);
+        (void) connect(download, &QGCFileDownload::finished, this, &QGCApplication::_qgcCurrentStableVersionDownloadComplete);
+        if (!download->start(versionCheckFile)) {
+            qCDebug(QGCApplicationLog) << "Download QGC stable version failed to start" << download->errorString();
+            download->deleteLater();
+        }
     }
 }
 
-void QGCApplication::_qgcCurrentStableVersionDownloadComplete(const QString &remoteFile, const QString &localFile, const QString &errorMsg)
+void QGCApplication::_qgcCurrentStableVersionDownloadComplete(bool success, const QString &localFile, const QString &errorMsg)
 {
-    Q_UNUSED(remoteFile);
-
-    if (errorMsg.isEmpty()) {
+    if (success) {
         QFile versionFile(localFile);
         if (versionFile.open(QIODevice::ReadOnly)) {
             QTextStream textStream(&versionFile);
@@ -499,7 +518,7 @@ void QGCApplication::_qgcCurrentStableVersionDownloadComplete(const QString &rem
                 }
             }
         }
-    } else {
+    } else if (!errorMsg.isEmpty()) {
         qCDebug(QGCApplicationLog) << "Download QGC stable version failed" << errorMsg;
     }
 
@@ -591,6 +610,8 @@ void QGCApplication::removeCompressedSignal(const QMetaMethod &method)
     _compressedSignals.remove(method);
 }
 
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
 bool QGCApplication::compressEvent(QEvent *event, QObject *receiver, QPostEventList *postedEvents)
 {
     if (event->type() != QEvent::MetaCall) {
@@ -629,6 +650,7 @@ bool QGCApplication::compressEvent(QEvent *event, QObject *receiver, QPostEventL
 
     return false;
 }
+QT_WARNING_POP
 
 bool QGCApplication::event(QEvent *e)
 {
