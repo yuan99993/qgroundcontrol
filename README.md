@@ -2,7 +2,7 @@
  * @Author: your name
  * @Date: 2026-01-29 20:21:04
  * @LastEditors: your name
- * @LastEditTime: 2026-03-04 16:10:33
+ * @LastEditTime: 2026-03-04 16:33:22
  * @Description:
  * @FilePath: \qgroundcontrol\README.md
 -->
@@ -17,6 +17,6 @@
   </a>
 </p>
 
-*重新基于QGC做出的部分二次开发功能testfun2222*.
+*重新基于QGC做出的部分二次开发功能test*.
 
 
