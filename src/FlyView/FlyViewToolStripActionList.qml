@@ -15,6 +15,7 @@ ToolStripActionList {
         GuidedActionTakeoff { },
         GuidedActionLand { },
         GuidedActionRTL { },
+        FlyViewXbeeButton { },  //插入的Xbee按钮
         GuidedActionPause { },
         FlyViewAdditionalActionsButton { },
         FlyViewGripperButton { }

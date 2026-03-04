@@ -32,6 +32,7 @@
         <file alias="JoystickBezel.png">resources/JoystickBezel.png</file>
         <file alias="JoystickBezelLight.png">resources/JoystickBezelLight.png</file>
         <file alias="land.svg">resources/land.svg</file>
+        <file alias="link.svg">resources/link.svg</file>    
         <file alias="layout-bottom.svg">resources/layout-bottom.svg</file>
         <file alias="layout-right.svg">resources/layout-right.svg</file>
         <file alias="LockClosed.svg">resources/LockClosed.svg</file>

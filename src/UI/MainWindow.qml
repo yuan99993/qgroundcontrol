@@ -1,4 +1,4 @@
-import QtQuick
+﻿import QtQuick
 import QtQuick.Controls
 import QtQuick.Dialogs
 import QtQuick.Layouts
@@ -70,7 +70,7 @@ ApplicationWindow {
         readonly property var       planMasterControllerFlyView:    flyView.planController
         readonly property var       guidedControllerFlyView:        flyView.guidedController
 
-        //新增，用于判断是否在Fly页面，在Fly页面才能右键打开插点菜单
+        //新增用于判断是否在Fly界面，在Fly界面才能右键打开菜单插点
         readonly property bool      isFlyPageActive:                flyView.visible && !planView.visible && !toolDrawer.visible
 
         // Number of QGCTextField's with validation errors. Used to prevent closing panels with validation errors.
@@ -151,6 +151,12 @@ ApplicationWindow {
         if (settingsPage !== "") {
             toolDrawerLoader.item.showSettingsPage(settingsPage)
         }
+    }
+
+    //新增的功能函数，给 Fly 左侧按钮一个统一入口，调用后打开 xbeeWindowLoader
+    function openXbeeWindow() {
+        console.log("Opening Xbee Window...")
+        xbeeWindowLoader.active = true
     }
 
     //-------------------------------------------------------------------------
@@ -644,10 +650,8 @@ ApplicationWindow {
         }
     }
 
-    // [自定义] Xbee 控制入口 (悬浮按钮 - 修正版)
-        // ==============================================================
 
-        // 1. 引入你的弹窗文件
+        // 弹窗文件加载，负责加载/显示 XbeeWindow.qml，并在窗口关闭时回收 active 状态
         Loader {
             id: xbeeWindowLoader
             source: "qrc:/qml/QGroundControl/CustomXbee/XbeeWindow.qml"
@@ -664,40 +668,4 @@ ApplicationWindow {
                 ignoreUnknownSignals: true
             }
         }
-
-        // 2. 在屏幕【右上角】画一个绿色按钮
-        Rectangle {
-            id: xbeeFloatingBtn
-            width: 100
-            height: 30
-            radius: 4
-            color: "#b2d732" // QGC 绿
-            z: 9999
-
-            // --- 修复点：位置改到右上角 ---
-            anchors.right: parent.right  // 靠右对齐
-            anchors.top: parent.top      // 靠顶对齐
-            anchors.rightMargin: 40     // 向左留出 150 像素（避开最小化/关闭按钮）
-            anchors.topMargin: 13         // 向下留出 5 像素
-
-            // 按钮文字
-            Text {
-                anchors.centerIn: parent
-                text: "XBEE"
-                font.bold: true
-                font.pixelSize: 12
-                color: "black"
-            }
-
-            // 点击事件
-            MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    console.log("Opening Xbee Window...")
-                    xbeeWindowLoader.active = true
-                }
-            }
-        }
-        // ==============================================================
 }

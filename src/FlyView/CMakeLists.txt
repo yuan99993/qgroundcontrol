@@ -34,6 +34,7 @@ qt_add_qml_module(FlyViewModule
         FlyViewPreFlightChecklistPopup.qml
         FlyViewToolStrip.qml
         FlyViewToolStripActionList.qml
+        FlyViewXbeeButton.qml       #加入的按钮文件
 
         FlyViewTopRightColumnLayout.qml
         FlyViewTopRightPanel.qml

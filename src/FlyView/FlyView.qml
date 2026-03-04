@@ -155,25 +155,17 @@ Item {
             visible:            false
         }
 
-<<<<<<< HEAD
-        Viewer3D {
-            id: viewer3DWindow
-            anchors.fill: parent
-        }
-
-    }
-=======
         Loader {
             id:             viewer3DLoader
             z:              1
             anchors.fill:   parent
             active:         _is3DMode
->>>>>>> fb529db72f6416b53370f3a6d62ac194b5e93db2
 
             onActiveChanged: {
                 if (active) {
-                    setSource("qrc:/qml/QGroundControl/Viewer3D/Models3D/Viewer3DModel.qml",
-)
+                    setSource("qrc:/qml/QGroundControl/Viewer3D/Models3D/Viewer3DModel.qml")
+                } else {
+                    source = ""
                 }
             }
         }
