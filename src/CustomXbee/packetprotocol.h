@@ -130,6 +130,8 @@ class PacketProtocol
                            ProtocolPointENU& outEnu);
 
     static ProtocolOrigin defaultOrigin();
+    static void setOrigin(double lat, double lng, double alt);      //由于发包在这里，在SeadBackend中获取到了经纬度，用于后续打包坐标
+    static bool hasOrigin();
         // 将ENU坐标(米)按给定原点反算为经纬高(LLA)，用于遥测显示。
     static ProtocolPointLLA enuToLla(double e,
                                      double n,

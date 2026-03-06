@@ -2,14 +2,27 @@
 
 #include <QDataStream>
 #include <QtMath>
+#include <cmath>
+#include <limits>
 
 namespace {
 const double kWgs84A = 6378137.0;
 const double kWgs84B = 6356752.314245;
 const double kWgs84E2 = 0.00669437999014;
-const double kOriginLat = 34.122320;
-const double kOriginLng = 108.829915;
-const double kOriginAlt = 535.0;
+ProtocolOrigin gOrigin {
+    std::numeric_limits<double>::quiet_NaN(),
+    std::numeric_limits<double>::quiet_NaN(),
+    std::numeric_limits<double>::quiet_NaN()
+};
+
+bool isOriginValid(const ProtocolOrigin& origin)
+{
+    return std::isfinite(origin.lat) &&
+           std::isfinite(origin.lng) &&
+           std::isfinite(origin.alt) &&
+           origin.lat >= -90.0 && origin.lat <= 90.0 &&
+           origin.lng >= -180.0 && origin.lng <= 180.0;
+}
 }
 
 // ========================== G2U Packing ==========================
@@ -204,11 +217,19 @@ bool PacketProtocol::coordToEnu(const QGeoCoordinate& coord,
 
 ProtocolOrigin PacketProtocol::defaultOrigin()
 {
-    ProtocolOrigin origin;
-    origin.lat = kOriginLat;
-    origin.lng = kOriginLng;
-    origin.alt = kOriginAlt;
-    return origin;
+    return gOrigin;
+}
+
+void PacketProtocol::setOrigin(double lat, double lng, double alt)
+{
+    gOrigin.lat = lat;
+    gOrigin.lng = lng;
+    gOrigin.alt = alt;
+}
+
+bool PacketProtocol::hasOrigin()
+{
+    return isOriginValid(gOrigin);
 }
 
 ProtocolPointLLA PacketProtocol::enuToLla(double e,

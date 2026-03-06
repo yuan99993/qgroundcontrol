@@ -2,6 +2,7 @@
 
 #include <QGeoCoordinate>
 #include <QObject>
+#include <limits>
 
 #include "MissionControl.h"
 #include "QmlObjectListModel.h"
@@ -10,7 +11,6 @@ class SeadMapPointItem : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QGeoCoordinate coordinate READ coordinate CONSTANT)
-
 public:
     explicit SeadMapPointItem(const QGeoCoordinate& coord, QObject* parent = nullptr)
         : QObject(parent)
@@ -42,6 +42,9 @@ class SeadBackend : public QObject
     Q_PROPERTY(double seadRmin READ seadRmin WRITE setSeadRmin NOTIFY configChanged)                // SEAD任务的飞行半径，单位m
     Q_PROPERTY(int waypointRadius READ waypointRadius WRITE setWaypointRadius NOTIFY configChanged) // 航点任务的触发半径，单位m
 
+    Q_PROPERTY(double originLat READ originLat WRITE setOriginLat NOTIFY configChanged)
+    Q_PROPERTY(double originLng READ originLng WRITE setOriginLng NOTIFY configChanged)
+    Q_PROPERTY(double originAlt READ originAlt WRITE setOriginAlt NOTIFY configChanged)
 public:
     explicit SeadBackend(MissionControl* missionControl = nullptr, QObject* parent = nullptr);
 
@@ -55,6 +58,9 @@ public:
     double seadVelocity() const { return _seadVelocity; }
     double seadRmin() const { return _seadRmin; }
     int waypointRadius() const { return _waypointRadius; }
+    double originLat() const { return _originLat; }
+    double originLng() const { return _originLng; }
+    double originAlt() const { return _originAlt; }
 
     //修改配置参数的接口
     void setMissionControl(MissionControl* missionControl);
@@ -63,6 +69,9 @@ public:
     void setSeadVelocity(double velocity);
     void setSeadRmin(double rmin);
     void setWaypointRadius(int radius);
+    void setOriginLat(double lat);
+    void setOriginLng(double lng);
+    void setOriginAlt(double alt);
 
 
     //QML可调用的接口
@@ -71,6 +80,8 @@ public:
     Q_INVOKABLE void insertTask(QGeoCoordinate coord);
     Q_INVOKABLE void addZoneVertex(QGeoCoordinate coord);
     Q_INVOKABLE void clearAll();
+    Q_INVOKABLE bool setOrigin(double lat, double lng, double alt); //设置经纬度的
+    Q_INVOKABLE bool hasValidOrigin() const;
 
 
     Q_INVOKABLE void sendSeadMission();
@@ -95,4 +106,7 @@ private:
     double _seadVelocity = 18.0;
     double _seadRmin = 35.0;
     int _waypointRadius = 15;
+    double _originLat = std::numeric_limits<double>::quiet_NaN();
+    double _originLng = std::numeric_limits<double>::quiet_NaN();
+    double _originAlt = std::numeric_limits<double>::quiet_NaN();
 };

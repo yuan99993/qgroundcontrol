@@ -2,6 +2,7 @@
 
 #include <QDataStream>
 #include <QVector>
+#include <cmath>
 #include <limits>
 
 namespace {
@@ -14,12 +15,25 @@ bool toMmInt32(double meters, qint32& out)
     out = static_cast<qint32>(mm);
     return true;
 }
+
+bool isOriginValid(double lat, double lng, double alt)  //用于判断原点经纬度是否合规
+{
+    return std::isfinite(lat) &&
+           std::isfinite(lng) &&
+           std::isfinite(alt) &&
+           lat >= -90.0 && lat <= 90.0 &&
+           lng >= -180.0 && lng <= 180.0;
+}
 }
 
 SeadBackend::SeadBackend(MissionControl* missionControl, QObject* parent)
     : QObject(parent)
     , _missionControl(missionControl)
 {
+    const ProtocolOrigin origin = PacketProtocol::defaultOrigin();
+    _originLat = origin.lat;
+    _originLng = origin.lng;
+    _originAlt = origin.alt;
 }
 
 void SeadBackend::setMissionControl(MissionControl* missionControl)
@@ -72,6 +86,36 @@ void SeadBackend::setWaypointRadius(int radius)
     emit configChanged();
 }
 
+void SeadBackend::setOriginLat(double lat)
+{
+    if (qFuzzyCompare(_originLat, lat)) {
+        return;
+    }
+    _originLat = lat;
+    PacketProtocol::setOrigin(_originLat, _originLng, _originAlt);
+    emit configChanged();
+}
+
+void SeadBackend::setOriginLng(double lng)
+{
+    if (qFuzzyCompare(_originLng, lng)) {
+        return;
+    }
+    _originLng = lng;
+    PacketProtocol::setOrigin(_originLat, _originLng, _originAlt);
+    emit configChanged();
+}
+
+void SeadBackend::setOriginAlt(double alt)
+{
+    if (qFuzzyCompare(_originAlt, alt)) {
+        return;
+    }
+    _originAlt = alt;
+    PacketProtocol::setOrigin(_originLat, _originLng, _originAlt);
+    emit configChanged();
+}
+
 void SeadBackend::addSeadPoint(QGeoCoordinate coord)
 {
     if (!coord.isValid()) {
@@ -120,6 +164,38 @@ void SeadBackend::clearAll()
     _zonePoints.clearAndDeleteContents();
 }
 
+bool SeadBackend::setOrigin(double lat, double lng, double alt)
+{
+    if (!isOriginValid(lat, lng, alt)) {
+        _log(">> Origin input invalid. Expected lat[-90,90], lng[-180,180], alt finite.");
+        return false;
+    }
+
+    const bool changed = !qFuzzyCompare(_originLat, lat) ||
+                         !qFuzzyCompare(_originLng, lng) ||
+                         !qFuzzyCompare(_originAlt, alt);
+
+    _originLat = lat;
+    _originLng = lng;
+    _originAlt = alt;
+    PacketProtocol::setOrigin(_originLat, _originLng, _originAlt);  //传经纬度给打包后端
+
+    if (changed) {
+        emit configChanged();
+    }
+
+    _log(QString(">> Origin set: lat=%1 lng=%2 alt=%3")
+             .arg(_originLat, 0, 'f', 6)
+             .arg(_originLng, 0, 'f', 6)
+             .arg(_originAlt, 0, 'f', 2));
+    return true;
+}
+
+bool SeadBackend::hasValidOrigin() const
+{
+    return isOriginValid(_originLat, _originLng, _originAlt);
+}
+
 void SeadBackend::sendSeadMission()
 {
     if (!_missionControl) {
@@ -129,6 +205,11 @@ void SeadBackend::sendSeadMission()
 
     if (_missionPoints.count() <= 0) {
         _log(">> No SEAD mission points.");
+        return;
+    }
+
+    if (!hasValidOrigin()) {
+        _log(">> Origin not set. Please input lat/lng/alt before sending SEAD.");
         return;
     }
 
@@ -155,12 +236,15 @@ void SeadBackend::saveZonesToFile()
 
 QByteArray SeadBackend::_buildTaskInsertPacket(int targetId, const QGeoCoordinate& coord, int taskType) const
 {
-    const ProtocolOrigin origin = PacketProtocol::defaultOrigin();
+    if (!hasValidOrigin()) {
+        _log(">> Origin not set. Task insert blocked.");
+        return QByteArray();
+    }
     ProtocolPointENU enu;
     enu.e = 0.0;
     enu.n = 0.0;
     enu.u = 0.0;
-    if (!PacketProtocol::coordToEnu(coord, origin.lat, origin.lng, origin.alt, enu)) {
+    if (!PacketProtocol::coordToEnu(coord, _originLat, _originLng, _originAlt, enu)) {
         return QByteArray();
     }
 
@@ -185,7 +269,10 @@ QByteArray SeadBackend::_buildTaskInsertPacket(int targetId, const QGeoCoordinat
 
 QByteArray SeadBackend::_buildSeadMissionPacket(int targetId)
 {
-    const ProtocolOrigin origin = PacketProtocol::defaultOrigin();
+    if (!hasValidOrigin()) {
+        _log(">> Origin not set. SEAD mission blocked.");
+        return QByteArray();
+    }
     QVector<ProtocolPointENU> points;
     points.reserve(_missionPoints.count());
 
@@ -198,7 +285,7 @@ QByteArray SeadBackend::_buildSeadMissionPacket(int targetId)
         enu.e = 0.0;
         enu.n = 0.0;
         enu.u = 0.0;
-        if (PacketProtocol::coordToEnu(item->coordinate(), origin.lat, origin.lng, origin.alt, enu)) {
+        if (PacketProtocol::coordToEnu(item->coordinate(), _originLat, _originLng, _originAlt, enu)) {
             points.push_back(enu);
         }
     }

@@ -7,10 +7,10 @@ import QGroundControl.Controls
 
 Window {
     id: root
-    width: 240
-    height: 280
-    minimumWidth: 240
-    minimumHeight: 280
+    width: 250
+    height: 315
+    minimumWidth: 250
+    minimumHeight: 315
     title: "SEAD Control"
     visible: true
     color: "#1A1A1A"
@@ -25,6 +25,14 @@ Window {
             const targetY = Math.max(0, logText.contentHeight - logFlick.height)
             logFlick.contentY = targetY
         })
+    }
+
+    //把前端文本框的经纬度值传给后端
+    function applyOriginFromInputs() {
+        const lat = txtOriginLat.text.trim().length > 0 ? Number(txtOriginLat.text) : NaN
+        const lng = txtOriginLng.text.trim().length > 0 ? Number(txtOriginLng.text) : NaN
+        const alt = txtOriginAlt.text.trim().length > 0 ? Number(txtOriginAlt.text) : 0
+        SeadManager.setOrigin(lat, lng, alt)
     }
 
     ColumnLayout {
@@ -94,7 +102,7 @@ Window {
                         id: txtIp
                         text: "192.168.129.128"
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 30
+                        Layout.preferredHeight: 27
                         font.pointSize: 8
                         leftPadding: 4
                     }
@@ -102,8 +110,8 @@ Window {
                     TextField {
                         id: txtPort
                         text: "14500"
-                        Layout.preferredWidth: 45
-                        Layout.preferredHeight: 30
+                        Layout.preferredWidth: 50
+                        Layout.preferredHeight: 27
                         font.pointSize: 8
                         leftPadding: 4
                     }
@@ -116,9 +124,61 @@ Window {
                         id: cmbPort
                         model: MissionControl.getSerialPorts()
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 30
+                        Layout.preferredHeight: 27
                         font.pointSize: 8
                     }
+                }
+            }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 30
+            color: "#252525"
+            radius: 2
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: 2
+                spacing: 4
+
+                Text { text: "Origin:"; color: "#aaa"; font.pointSize: 8 }
+                TextField {
+                    id: txtOriginLat
+                    text: isFinite(SeadManager.originLat) ? SeadManager.originLat.toFixed(6) : ""
+                    placeholderText: "lat"
+                    Layout.preferredWidth: 53
+                    Layout.preferredHeight: 27
+                    font.pointSize: 8
+                    leftPadding: 4
+                    //onEditingFinished: root.applyOriginFromInputs()   //这个会触发不选择文本框就触发一次设置
+                }
+                TextField {
+                    id: txtOriginLng
+                    text: isFinite(SeadManager.originLng) ? SeadManager.originLng.toFixed(6) : ""
+                    placeholderText: "lng"
+                    Layout.preferredWidth: 53
+                    Layout.preferredHeight: 27
+                    font.pointSize: 8
+                    leftPadding: 4
+                    //onEditingFinished: root.applyOriginFromInputs()
+                }
+                TextField {
+                    id: txtOriginAlt
+                    text: isFinite(SeadManager.originAlt) ? SeadManager.originAlt.toFixed(1) : ""
+                    placeholderText: "alt"
+                    Layout.preferredWidth: 37
+                    Layout.preferredHeight: 27
+                    font.pointSize: 8
+                    leftPadding: 4
+                    //onEditingFinished: root.applyOriginFromInputs()
+                }
+                Button {
+                    text: "Set"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 27
+                    font.pointSize: 8
+                    onClicked: root.applyOriginFromInputs()
                 }
             }
         }

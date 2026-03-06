@@ -280,18 +280,24 @@ void MissionControl::processPacket(QByteArray data)
         m["yaw"] = QString::number(st.yaw, 'f', 1);
         m["heading"] = QString::number(st.yaw, 'f', 1);
 
-        const ProtocolOrigin origin = PacketProtocol::defaultOrigin();
-        const ProtocolPointLLA realPos = PacketProtocol::enuToLla(
-            st.x,
-            st.y,
-            st.z,
-            origin.lat,
-            origin.lng,
-            origin.alt
-        );
-        m["lat"] = QString::number(realPos.lat, 'f', 7);
-        m["lng"] = QString::number(realPos.lng, 'f', 7);
-        m["alt"] = QString::number(realPos.alt, 'f', 4);
+        if (PacketProtocol::hasOrigin()) {
+            const ProtocolOrigin origin = PacketProtocol::defaultOrigin();
+            const ProtocolPointLLA realPos = PacketProtocol::enuToLla(
+                st.x,
+                st.y,
+                st.z,
+                origin.lat,
+                origin.lng,
+                origin.alt
+            );
+            m["lat"] = QString::number(realPos.lat, 'f', 7);
+            m["lng"] = QString::number(realPos.lng, 'f', 7);
+            m["alt"] = QString::number(realPos.alt, 'f', 4);
+        } else {
+            m["lat"] = "--";
+            m["lng"] = "--";
+            m["alt"] = "--";
+        }
         m["info"] = "OK";
 
         _uavTable[st.uav_id] = m;
