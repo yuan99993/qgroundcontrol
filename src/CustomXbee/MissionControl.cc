@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <QNetworkDatagram>
+#include <QRegularExpression>
 #include <QSerialPortInfo>
 
 MissionControl::MissionControl(QObject* parent)
@@ -38,6 +39,63 @@ QStringList MissionControl::getSerialPorts()
     QStringList list;
     for (const auto& info : QSerialPortInfo::availablePorts()) {
         list << info.portName();
+    }
+    return list;
+}
+
+bool MissionControl::_parseMacHex(const QString& macHex, QByteArray& outMac)
+{
+    QString normalized = macHex;
+    normalized.remove(' ');
+    normalized.remove(':');
+    normalized.remove('-');
+    normalized = normalized.trimmed().toUpper();
+
+    static const QRegularExpression macPattern("^[0-9A-F]{16}$");
+    if (!macPattern.match(normalized).hasMatch()) {
+        return false;
+    }
+
+    outMac = QByteArray::fromHex(normalized.toLatin1());
+    return outMac.size() == 8;
+}
+
+bool MissionControl::setXbeeRoute(int uavId, const QString& macHex)
+{
+    if (uavId <= 0 || uavId > 255) {
+        emit logMessage(">> Error: UAV ID must be in [1,255].");
+        return false;
+    }
+
+    QByteArray mac;
+    if (!_parseMacHex(macHex, mac)) {
+        emit logMessage(">> Error: Invalid MAC. Expect 16 hex chars, e.g. 0013A2004105EB5A.");
+        return false;
+    }
+
+    _macTable[uavId] = mac;
+    return true;
+}
+
+QString MissionControl::getXbeeRouteMac(int uavId) const
+{
+    const QByteArray mac = _macTable.value(uavId, QByteArray());
+    if (mac.size() != 8) {
+        return QString();
+    }
+    return QString(mac.toHex().toUpper());
+}
+
+QVariantList MissionControl::getXbeeRoutes() const
+{
+    QVariantList list;
+    QList<int> keys = _macTable.keys();
+    std::sort(keys.begin(), keys.end());
+    for (int id : keys) {
+        QVariantMap row;
+        row["id"] = id;
+        row["mac"] = QString(_macTable.value(id).toHex().toUpper());
+        list.append(row);
     }
     return list;
 }
@@ -127,14 +185,29 @@ bool MissionControl::sendPayload(int targetID, QByteArray payload)
     if (targetID == 0) {
         sendList = _uavTable.keys();
         if (sendList.isEmpty()) {
-            // Testing fallback: if no active telemetry, still allow sending ID=0 once.
-            sendList.append(0);
-            emit logMessage(">> Warning: No active UAV telemetry, fallback to UAV ID 0.");
+            if (_useXbee) {
+                sendList = _macTable.keys();
+                if (sendList.isEmpty()) {
+                    emit logMessage(">> Error: No XBee route configured. Add ID+MAC first.");
+                    return false;
+                }
+                emit logMessage(">> Warning: No active UAV telemetry, fallback to configured XBee routes.");
+            } else {
+                sendList.append(0);
+                emit logMessage(">> Warning: No active UAV telemetry, fallback to UAV ID 0.");
+            }
         }
     } else {
-        if (!_uavTable.contains(targetID)) {
-            emit logMessage(QString(">> Error: UAV %1 is not active.").arg(targetID));
-            return false;
+        if (_useXbee) {
+            if (!_macTable.contains(targetID)) {
+                emit logMessage(QString(">> Error: UAV %1 has no configured XBee route.").arg(targetID));
+                return false;
+            }
+        } else {
+            if (!_uavTable.contains(targetID)) {
+                emit logMessage(QString(">> Error: UAV %1 is not active.").arg(targetID));
+                return false;
+            }
         }
         sendList.append(targetID);
     }
@@ -143,18 +216,24 @@ bool MissionControl::sendPayload(int targetID, QByteArray payload)
 
     bool allOk = true;
     for (int id : sendList) {
-        if (payload.size() >= 2) {
-            payload[1] = static_cast<char>(id);
+        QByteArray packet = payload;
+        if (packet.size() >= 2) {
+            packet[1] = static_cast<char>(id);
         }
 
         if (_useXbee) {
-            const QByteArray mac = _macTable.value(id, QByteArray::fromHex("FFFFFFFFFFFFFFFF"));
-            const QByteArray frame = PacketProtocol::wrapXbeeApiFrame(mac, payload);
+            const QByteArray mac = _macTable.value(id, QByteArray());
+            if (mac.size() != 8) {
+                emit logMessage(QString(">> Error: Missing/invalid XBee route for UAV %1.").arg(id));
+                allOk = false;
+                continue;
+            }
+            const QByteArray frame = PacketProtocol::wrapXbeeApiFrame(mac, packet);
             if (_serial->write(frame) < 0) {
                 allOk = false;
             }
         } else {
-            if (_udp->writeDatagram(payload, _targetIp, _targetPort) < 0) {
+            if (_udp->writeDatagram(packet, _targetIp, _targetPort) < 0) {
                 allOk = false;
             }
         }

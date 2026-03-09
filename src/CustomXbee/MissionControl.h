@@ -33,10 +33,14 @@ public:
     Q_INVOKABLE void sendRTL(int targetID);
     Q_INVOKABLE void sendMode(int targetID, QString modeName);
 
+    Q_INVOKABLE bool setXbeeRoute(int uavId, const QString& macHex);    //前端可调用的设置ID对应的MAC地址表
+    Q_INVOKABLE QString getXbeeRouteMac(int uavId) const;               //按 ID 查询 MAC
+    Q_INVOKABLE QVariantList getXbeeRoutes() const;                     //获取当前全部路由（用于日志全量输出）
+
     bool isConnected() const;       //返回当前链路是否连上（UDP是否连接或者Xbee是否连上）
     int activeUavCount() const { return _uavTable.size(); }     //返回当前在线无人机数量
     bool sendCustomPayload(int targetID, const QByteArray& payload, const QString& commandLabel = QString());
-    void appendLogMessage(const QString& msg);
+    Q_INVOKABLE void appendLogMessage(const QString& msg);
 
 signals:
     void connectionChanged();
@@ -69,4 +73,5 @@ private:
     void processPacket(QByteArray data);        //解析机载回传包：遥测更新状态表、文本消息写日志
     void _emitUavList();       //把内部 _uavTable 转成 QVariantList 发给 QML
     void _logCommandSent(const QString& commandLabel, int targetID);
+    static bool _parseMacHex(const QString& macHex, QByteArray& outMac);
 };

@@ -1,4 +1,4 @@
-import QtQuick
+﻿import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
@@ -8,9 +8,9 @@ import QGroundControl.Controls
 Window {
     id: root
     width: 250
-    height: 315
+    height: 355
     minimumWidth: 250
-    minimumHeight: 315
+    minimumHeight: 355
     title: "SEAD Control"
     visible: true
     color: "#1A1A1A"
@@ -35,6 +35,55 @@ Window {
         SeadManager.setOrigin(lat, lng, alt)
     }
 
+    //日志栏显示ID和MAC地址
+    function formatXbeeRoutesForLog() {
+        const routes = MissionControl.getXbeeRoutes()
+        if (!routes || routes.length === 0) {
+            return "none"
+        }
+        const parts = []
+        for (let i = 0; i < routes.length; i++) {
+            parts.push(routes[i].id + ":" + routes[i].mac)
+        }
+        return parts.join("  ")
+    }
+
+    //让在输入框输入已存在ID时MAC框自动跳出该ID对应的MAC地址
+    function queryXbeeRouteById() {
+        const id = Number(txtRouteId.text)
+        if (!Number.isInteger(id) || id < 1 || id > 255) {
+            return
+        }
+        const knownMac = MissionControl.getXbeeRouteMac(id)
+        if (knownMac.length > 0) {
+            txtRouteMac.text = knownMac
+        }
+    }
+
+    function applyXbeeRouteFromInputs() {
+        const id = Number(txtRouteId.text)
+        const mac = txtRouteMac.text.trim()
+
+        if (modeSelector.currentIndex !== 1) {
+            MissionControl.appendLogMessage(">> Route save is available in Xbee mode only.")
+            return
+        }
+        if (!Number.isInteger(id) || id < 1 || id > 255) {
+            MissionControl.appendLogMessage(">> Route input invalid: ID must be 1-255.")
+            return
+        }
+        if (mac.length === 0) {
+            MissionControl.appendLogMessage(">> Route input invalid: MAC is empty.")
+            return
+        }
+        if (!MissionControl.setXbeeRoute(id, mac)) { //设置ID和MAC地址
+            return
+        }
+
+        queryXbeeRouteById()
+        MissionControl.appendLogMessage(">> XBee routes: " + formatXbeeRoutesForLog())  //日志栏显示当前的ID和ID对应MAC地址
+    }
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 7
@@ -51,6 +100,11 @@ Window {
                 Layout.preferredHeight: 25
                 model: ["UDP", "Xbee"]
                 font.pointSize: 8
+                onCurrentIndexChanged: {
+                    if (currentIndex === 1) {
+                        MissionControl.appendLogMessage(">> XBee routes: " + root.formatXbeeRoutesForLog())
+                    }
+                }
             }
 
             Button {
@@ -82,6 +136,48 @@ Window {
             text: "UAV Active: " + MissionControl.activeUavCount
             color: hasActiveUavs ? "#7CFC00" : "#aaaaaa"
             font.pointSize: 8
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: modeSelector.currentIndex === 1 ? 34 : 0
+            visible: modeSelector.currentIndex === 1
+            color: "#252525"
+            radius: 2
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: 2
+                spacing: 4
+
+                Text { text: "Route:"; color: "#aaa"; font.pointSize: 8 }
+                TextField {
+                    id: txtRouteId
+                    text: ""
+                    placeholderText: "ID"
+                    Layout.preferredWidth: 56
+                    Layout.preferredHeight: 27
+                    font.pointSize: 8
+                    leftPadding: 4
+                    onEditingFinished: root.queryXbeeRouteById()
+                }
+                TextField {
+                    id: txtRouteMac
+                    text: ""
+                    placeholderText: "MAC Address"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 27
+                    font.pointSize: 8
+                    leftPadding: 4
+                }
+                Button {
+                    text: "Save"
+                    Layout.preferredWidth: 50
+                    Layout.preferredHeight: 27
+                    font.pointSize: 8
+                    onClicked: root.applyXbeeRouteFromInputs()
+                }
+            }
         }
 
         Rectangle {
