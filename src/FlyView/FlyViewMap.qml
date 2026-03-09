@@ -39,6 +39,64 @@ FlightMap {
     property bool   _disableVehicleTracking:    false
     property bool   _keepVehicleCentered:       pipMode ? true : false
     property bool   _saveZoomLevelSetting:      true
+    property var    _airZonePolygons:           []
+
+    //禁飞区相关函数
+    function _toCoordPath(rawPath, closeLoop) {
+        const out = []
+        if (!rawPath) {
+            return out
+        }
+
+        let total = 0
+        if (rawPath.length !== undefined) {
+            total = rawPath.length
+        } else if (rawPath.count !== undefined) {
+            total = rawPath.count
+        }
+
+        for (let i = 0; i < total; i++) {
+            let c
+            if (rawPath.get !== undefined) {
+                c = rawPath.get(i)
+            } else {
+                c = rawPath[i]
+            }
+            if (c && c.coordinate !== undefined) {
+                c = c.coordinate
+            }
+
+            let lat
+            let lng
+            let alt = 0
+
+            if (c) {
+                lat = (typeof c.latitude === "function") ? c.latitude() : c.latitude
+                lng = (typeof c.longitude === "function") ? c.longitude() : c.longitude
+                if (c.altitude !== undefined) {
+                    alt = (typeof c.altitude === "function") ? c.altitude() : c.altitude
+                }
+                if (lat === undefined && c.lat !== undefined) {
+                    lat = (typeof c.lat === "function") ? c.lat() : c.lat
+                }
+                if (lng === undefined && c.lng !== undefined) {
+                    lng = (typeof c.lng === "function") ? c.lng() : c.lng
+                }
+            }
+
+            if (lat !== undefined && lng !== undefined) {
+                out.push(QtPositioning.coordinate(lat, lng, alt !== undefined ? alt : 0))
+            }
+        }
+        if (closeLoop && out.length > 2) {
+            out.push(out[0])
+        }
+        return out
+    }
+
+    function _refreshAirZonePolygons() {
+        _airZonePolygons = SeadBackend.getZonePolygons()
+    }
 
     function _adjustMapZoomForPipMode() {
         _saveZoomLevelSetting = false
@@ -208,6 +266,24 @@ FlightMap {
         running:        true
         repeat:         true
         onTriggered:    updateMapToVehiclePosition()
+    }
+
+    //新增
+    Component.onCompleted: _refreshAirZonePolygons()
+
+    Connections {
+        target: SeadBackend
+        ignoreUnknownSignals: true
+        function onConfigChanged() {
+            _refreshAirZonePolygons()
+        }
+    }
+
+    Timer {
+        interval: 1000
+        running: true
+        repeat: true
+        onTriggered: _refreshAirZonePolygons()
     }
 
     QGCMapPalette { id: mapPal; lightColors: isSatelliteMap }
@@ -824,20 +900,20 @@ FlightMap {
 
         QGCMenuItem {
             text: "插入 SEAD 任务点"
-            onTriggered: SeadManager.addSeadPoint(seadContextMenu.clickCoordinate)
+            onTriggered: SeadBackend.addSeadPoint(seadContextMenu.clickCoordinate)
         }
         QGCMenuItem {
             text: "中途插入任务点"
-            onTriggered: SeadManager.insertTask(seadContextMenu.clickCoordinate)
+            onTriggered: SeadBackend.insertTask(seadContextMenu.clickCoordinate)
         }
         QGCMenuItem {
             text: "增加禁飞区顶点"
-            onTriggered: SeadManager.addZoneVertex(seadContextMenu.clickCoordinate)
+            onTriggered: SeadBackend.addZoneVertex(seadContextMenu.clickCoordinate)
         }
         QGCMenuSeparator { }
         QGCMenuItem {
             text: "清除所有点位"
-            onTriggered: SeadManager.clearAll()
+            onTriggered: SeadBackend.clearAll()
         }
     }
 
@@ -845,7 +921,7 @@ FlightMap {
 
     // --- 1. SEAD 初始任务点 (黄色) ---
     MapItemView {
-        model: SeadManager.missionPoints
+        model: SeadBackend.missionPoints
         delegate: MapQuickItem {
             coordinate:     object.coordinate
             anchorPoint:    Qt.point(sourceItem.width/2, sourceItem.height/2)
@@ -859,7 +935,7 @@ FlightMap {
 
     // --- 2. 中途插入点 (浅蓝色) ---
     MapItemView {
-        model: SeadManager.insertPoints
+        model: SeadBackend.insertPoints
         delegate: MapQuickItem {
             coordinate:     object.coordinate
             anchorPoint:    Qt.point(sourceItem.width/2, sourceItem.height/2)
@@ -873,13 +949,59 @@ FlightMap {
 
     // --- 3. 禁飞区边界点 (红色) ---
     MapItemView {
-        model: SeadManager.zonePoints
+        model: SeadBackend.zonePoints
         delegate: MapQuickItem {
             coordinate:     object.coordinate
             anchorPoint:    Qt.point(sourceItem.width/2, sourceItem.height/2)
             z:              QGroundControl.zOrderMapItems
             sourceItem: Rectangle {
                 width: 12; height: 12; color: "red"; radius: 6; border.color: "white"
+            }
+        }
+    }
+
+    MapItemView {
+        model: _airZonePolygons
+        delegate: MapPolygon {
+            path: _root._toCoordPath(modelData.path, false)
+            color: "#22FF4444"
+            border.width: 1
+            border.color: "#AAFF6666"
+            z: QGroundControl.zOrderMapItems
+        }
+    }
+
+    MapItemView {
+        model: _airZonePolygons
+        delegate: MapPolyline {
+            path: _root._toCoordPath(modelData.path, true)
+            line.width: 5
+            line.color: "#FFFF2222"
+            z: QGroundControl.zOrderTopMost - 1
+        }
+    }
+
+    MapItemView {
+        model: _airZonePolygons
+        delegate: MapQuickItem {
+            property var _path: _root._toCoordPath(modelData.path, false)
+            visible: _path.length > 0
+            coordinate: _path.length > 0 ? _path[0] : QtPositioning.coordinate()
+            anchorPoint: Qt.point(sourceItem.width / 2, sourceItem.height / 2)
+            z: QGroundControl.zOrderMapItems + 2
+            sourceItem: Rectangle {
+                width: 28
+                height: 16
+                radius: 3
+                color: "#CC111111"
+                border.width: 1
+                border.color: "#FFFF6666"
+                QGCLabel {
+                    anchors.centerIn: parent
+                    text: "Z" + modelData.zoneId
+                    font.pixelSize: 10
+                    color: "#FFFFFF"
+                }
             }
         }
     }

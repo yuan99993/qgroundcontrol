@@ -4,6 +4,7 @@
 #include <QObject>
 #include <limits>
 
+#include "AirZonesBackend.h"
 #include "MissionControl.h"
 #include "QmlObjectListModel.h"
 
@@ -87,6 +88,7 @@ public:
     Q_INVOKABLE void sendSeadMission();
     Q_INVOKABLE void uploadZones();
     Q_INVOKABLE void saveZonesToFile();
+    Q_INVOKABLE QVariantList getZonePolygons() const;
 
 signals:
     void configChanged();
@@ -95,8 +97,10 @@ private:
     QByteArray _buildSeadMissionPacket(int targetId);   //把当前 _missionPoints 里的点打包成 SEAD_mission (msg_id=18) 二进制数据帧。返回可直接发送的字节包（QByteArray
     QByteArray _buildTaskInsertPacket(int targetId, const QGeoCoordinate& coord, int taskType) const;   //把一个“中途插入任务点”打包成 Task_Insert (msg_id=19)
     void _log(const QString& msg) const;    //把文本转发给 MissionControl，显示到窗口日志框
+    void _syncZonePoints();
 
     MissionControl* _missionControl = nullptr;  //指向通信后端（UDP/Xbee）的指针
+    AirZonesBackend _airZones;
     QmlObjectListModel _missionPoints;
     QmlObjectListModel _insertPoints;
     QmlObjectListModel _zonePoints;

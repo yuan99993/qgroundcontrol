@@ -32,7 +32,7 @@ Window {
         const lat = txtOriginLat.text.trim().length > 0 ? Number(txtOriginLat.text) : NaN
         const lng = txtOriginLng.text.trim().length > 0 ? Number(txtOriginLng.text) : NaN
         const alt = txtOriginAlt.text.trim().length > 0 ? Number(txtOriginAlt.text) : 0
-        SeadManager.setOrigin(lat, lng, alt)
+        SeadBackend.setOrigin(lat, lng, alt)
     }
 
     //日志栏显示ID和MAC地址
@@ -241,7 +241,7 @@ Window {
                 Text { text: "Origin:"; color: "#aaa"; font.pointSize: 8 }
                 TextField {
                     id: txtOriginLat
-                    text: isFinite(SeadManager.originLat) ? SeadManager.originLat.toFixed(6) : ""
+                    text: isFinite(SeadBackend.originLat) ? SeadBackend.originLat.toFixed(6) : ""
                     placeholderText: "lat"
                     Layout.preferredWidth: 53
                     Layout.preferredHeight: 27
@@ -251,7 +251,7 @@ Window {
                 }
                 TextField {
                     id: txtOriginLng
-                    text: isFinite(SeadManager.originLng) ? SeadManager.originLng.toFixed(6) : ""
+                    text: isFinite(SeadBackend.originLng) ? SeadBackend.originLng.toFixed(6) : ""
                     placeholderText: "lng"
                     Layout.preferredWidth: 53
                     Layout.preferredHeight: 27
@@ -261,7 +261,7 @@ Window {
                 }
                 TextField {
                     id: txtOriginAlt
-                    text: isFinite(SeadManager.originAlt) ? SeadManager.originAlt.toFixed(1) : ""
+                    text: isFinite(SeadBackend.originAlt) ? SeadBackend.originAlt.toFixed(1) : ""
                     placeholderText: "alt"
                     Layout.preferredWidth: 37
                     Layout.preferredHeight: 27
@@ -317,17 +317,17 @@ Window {
             TaskButton {
                 text: "SEAD 下发"
                 borderColor: qgcGreen
-                onClicked: SeadManager.sendSeadMission()
+                onClicked: SeadBackend.sendSeadMission()
             }
             TaskButton {
                 text: "禁飞区下发"
                 borderColor: "#e67e22"
-                onClicked: SeadManager.uploadZones()
+                onClicked: SeadBackend.uploadZones()
             }
             TaskButton {
-                text: "禁飞区绘制"
+                text: "禁飞区保存"
                 borderColor: "#ff4b4b"
-                onClicked: SeadManager.saveZonesToFile()
+                onClicked: SeadBackend.saveZonesToFile()
             }
         }
 

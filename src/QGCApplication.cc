@@ -266,7 +266,7 @@ void QGCApplication::_initForNormalAppBoot()
     MissionControl* missionControl = new MissionControl(this);
     _qmlAppEngine->rootContext()->setContextProperty("MissionControl", missionControl);
     SeadBackend* seadBackend = new SeadBackend(missionControl, this);
-    _qmlAppEngine->rootContext()->setContextProperty("SeadManager", seadBackend);
+    _qmlAppEngine->rootContext()->setContextProperty("SeadBackend", seadBackend);
 
     QGCCorePlugin::instance()->createRootWindow(_qmlAppEngine);
 

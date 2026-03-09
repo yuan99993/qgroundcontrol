@@ -23,6 +23,10 @@ enum Message_ID {
     SEAD = 17,
     SEAD_mission = 18,
     Task_Insert = 19,
+    Airspace_Clear = 20,
+    Airspace_ZoneFrag = 21,
+    Airspace_ZoneRemove = 22,
+    Airspace_Ack = 23,
     info = 44           // 文本消息
 };
 
