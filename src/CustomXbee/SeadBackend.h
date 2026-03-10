@@ -3,8 +3,6 @@
 #include <QGeoCoordinate>
 #include <QObject>
 #include <limits>
-
-#include "AirZonesBackend.h"
 #include "MissionControl.h"
 #include "QmlObjectListModel.h"
 
@@ -34,7 +32,6 @@ class SeadBackend : public QObject
     /* Q_PROPERTY(...) 把 C++ 成员“声明成属性”，让 QML 能直接访问。 */
     Q_PROPERTY(QmlObjectListModel* missionPoints READ missionPoints CONSTANT)   //任务点
     Q_PROPERTY(QmlObjectListModel* insertPoints READ insertPoints CONSTANT)     //插入点
-    Q_PROPERTY(QmlObjectListModel* zonePoints READ zonePoints CONSTANT)         //禁飞区顶点
 
     // 配置参数
     Q_PROPERTY(int targetUavId READ targetUavId WRITE setTargetUavId NOTIFY configChanged)  // 目标无人机ID，0表示广播给所有无人机
@@ -51,7 +48,6 @@ public:
 
     QmlObjectListModel* missionPoints() { return &_missionPoints; } //任务点列表，维护一个列表，每个元素是一个SeadMapPointItem对象，包含一个QGeoCoordinate坐标，在点击SEAD按钮后下发该列表中的点
     QmlObjectListModel* insertPoints() { return &_insertPoints; }   //插入点列表
-    QmlObjectListModel* zonePoints() { return &_zonePoints; }       //禁飞区顶点列表
 
     //获取配置参数的接口
     int targetUavId() const { return _targetUavId; }
@@ -79,16 +75,12 @@ public:
     /* Q_INVOKABLE 标记函数可被 QML 直接调用。 */
     Q_INVOKABLE void addSeadPoint(QGeoCoordinate coord);
     Q_INVOKABLE void insertTask(QGeoCoordinate coord);
-    Q_INVOKABLE void addZoneVertex(QGeoCoordinate coord);
-    Q_INVOKABLE void clearAll();
+    Q_INVOKABLE void clearAllSeadPoints();      //清除SEAD所有点
     Q_INVOKABLE bool setOrigin(double lat, double lng, double alt); //设置经纬度的
-    Q_INVOKABLE bool hasValidOrigin() const;
+    Q_INVOKABLE bool hasValidOrigin() const;    //判断经纬度点有效性
 
 
     Q_INVOKABLE void sendSeadMission();
-    Q_INVOKABLE void uploadZones();
-    Q_INVOKABLE void saveZonesToFile();
-    Q_INVOKABLE QVariantList getZonePolygons() const;
 
 signals:
     void configChanged();
@@ -97,13 +89,10 @@ private:
     QByteArray _buildSeadMissionPacket(int targetId);   //把当前 _missionPoints 里的点打包成 SEAD_mission (msg_id=18) 二进制数据帧。返回可直接发送的字节包（QByteArray
     QByteArray _buildTaskInsertPacket(int targetId, const QGeoCoordinate& coord, int taskType) const;   //把一个“中途插入任务点”打包成 Task_Insert (msg_id=19)
     void _log(const QString& msg) const;    //把文本转发给 MissionControl，显示到窗口日志框
-    void _syncZonePoints();
 
     MissionControl* _missionControl = nullptr;  //指向通信后端（UDP/Xbee）的指针
-    AirZonesBackend _airZones;
     QmlObjectListModel _missionPoints;
     QmlObjectListModel _insertPoints;
-    QmlObjectListModel _zonePoints;
 
     int _targetUavId = 0;     // 0 = all active UAVs
     int _seadUavType = 2;

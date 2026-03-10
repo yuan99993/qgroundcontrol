@@ -118,7 +118,7 @@ class PacketProtocol
 
     // ================== U2G 解包 (接收) ==================
 
-        /// 解析机载遥测包(<BBBBBBdiiiiiii>)并还原物理量单位，成功返回true。
+        // 解析机载遥测包(<BBBBBBdiiiiiii>)并还原物理量单位，成功返回true。
     static bool parseUavStatus(const QByteArray& data, UavStatus& out);
 
         // 解析文本信息包: [info, uav_id, len, utf8_bytes...]，返回消息字符串。

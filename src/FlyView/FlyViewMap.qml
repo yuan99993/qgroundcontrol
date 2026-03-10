@@ -1,4 +1,4 @@
-import QtQuick
+﻿import QtQuick
 import QtQuick.Controls
 import QtLocation
 import QtPositioning
@@ -39,9 +39,9 @@ FlightMap {
     property bool   _disableVehicleTracking:    false
     property bool   _keepVehicleCentered:       pipMode ? true : false
     property bool   _saveZoomLevelSetting:      true
-    property var    _airZonePolygons:           []
+    property var    _airZonePolygons:           []      //新增禁飞区用
 
-    //禁飞区相关函数
+    //禁飞区相关函数：把“各种格式的点列表”统一转换成地图可画的坐标路径
     function _toCoordPath(rawPath, closeLoop) {
         const out = []
         if (!rawPath) {
@@ -94,8 +94,9 @@ FlightMap {
         return out
     }
 
+    //禁飞区函数：从后端拉最新禁飞区列表
     function _refreshAirZonePolygons() {
-        _airZonePolygons = SeadBackend.getZonePolygons()
+        _airZonePolygons = AirZonesBackend.qmlGetZonePolygons()
     }
 
     function _adjustMapZoomForPipMode() {
@@ -268,13 +269,14 @@ FlightMap {
         onTriggered:    updateMapToVehiclePosition()
     }
 
-    //新增
+    //新增：页面刚加载完成时，先拉一次后端数据
     Component.onCompleted: _refreshAirZonePolygons()
 
+    //监听后端 configChanged 信号。每次新增顶点、保存禁飞区、清空、修改相关配置后，前端自动重新取 getZonePolygons()
     Connections {
-        target: SeadBackend
+        target: AirZonesBackend
         ignoreUnknownSignals: true
-        function onConfigChanged() {
+        function onZonesChanged() {
             _refreshAirZonePolygons()
         }
     }
@@ -908,14 +910,16 @@ FlightMap {
         }
         QGCMenuItem {
             text: "增加禁飞区顶点"
-            onTriggered: SeadBackend.addZoneVertex(seadContextMenu.clickCoordinate)
+            onTriggered: AirZonesBackend.qmlAddZoneVertex(seadContextMenu.clickCoordinate)
         }
         QGCMenuSeparator { }
         QGCMenuItem {
             text: "清除所有点位"
-            onTriggered: SeadBackend.clearAll()
+            onTriggered: { SeadBackend.clearAllSeadPoints();/*SEAD点清理*/ AirZonesBackend.qmlClearAllZones(); /*禁飞区清理*/}
         }
     }
+
+
 
     // src/FlyView/FlyViewMap.qml
 
@@ -949,7 +953,7 @@ FlightMap {
 
     // --- 3. 禁飞区边界点 (红色) ---
     MapItemView {
-        model: SeadBackend.zonePoints
+        model: AirZonesBackend.zonePoints
         delegate: MapQuickItem {
             coordinate:     object.coordinate
             anchorPoint:    Qt.point(sourceItem.width/2, sourceItem.height/2)
@@ -960,6 +964,7 @@ FlightMap {
         }
     }
 
+    //画禁飞区填充面
     MapItemView {
         model: _airZonePolygons
         delegate: MapPolygon {
@@ -971,16 +976,18 @@ FlightMap {
         }
     }
 
+    //画禁飞区外边界线
     MapItemView {
         model: _airZonePolygons
         delegate: MapPolyline {
             path: _root._toCoordPath(modelData.path, true)
-            line.width: 5
+            line.width: 1
             line.color: "#FFFF2222"
             z: QGroundControl.zOrderTopMost - 1
         }
     }
 
+    //在每个禁飞区首点放标签（Z1/Z2/...）
     MapItemView {
         model: _airZonePolygons
         delegate: MapQuickItem {

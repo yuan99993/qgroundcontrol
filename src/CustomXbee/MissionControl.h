@@ -25,7 +25,7 @@ public:
     Q_INVOKABLE void connectXbee(QString portName); //启动 Xbee 模式并绑定COM口，准备收发
     Q_INVOKABLE void disconnectAll();        //关闭 UDP/串口，清空在线无人机状态表
 
-    //发送指令
+    //发送模式设置指令
     Q_INVOKABLE void sendArm(int targetID);
     Q_INVOKABLE void sendDisarm(int targetID);
     Q_INVOKABLE void sendTakeoff(int targetID, int height);

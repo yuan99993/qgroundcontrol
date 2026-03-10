@@ -1,4 +1,4 @@
-#include "QGCApplication.h"
+﻿#include "QGCApplication.h"
 #include "qgc_version.h"
 
 #include <QtCore/QEvent>
@@ -45,6 +45,7 @@
 //相关文件
 #include "CustomXbee/MissionControl.h" // 引用你的新类
 #include "CustomXbee/SeadBackend.h"
+#include "CustomXbee/AirZonesBackend.h"
 
 #ifndef QGC_NO_SERIAL_LINK
 #include "SerialLink.h"
@@ -265,8 +266,12 @@ void QGCApplication::_initForNormalAppBoot()
     // 新代码
     MissionControl* missionControl = new MissionControl(this);
     _qmlAppEngine->rootContext()->setContextProperty("MissionControl", missionControl);
-    SeadBackend* seadBackend = new SeadBackend(missionControl, this);
+    SeadBackend* seadBackend = new SeadBackend(missionControl, this);     //传missionControl是因为要用内部方法
     _qmlAppEngine->rootContext()->setContextProperty("SeadBackend", seadBackend);
+    AirZonesBackend* airZonesBackend = new AirZonesBackend(this);
+    airZonesBackend->setMissionControl(missionControl);     //传missionControl是因为要用内部方法
+    airZonesBackend->setOrigin(seadBackend->originLat(), seadBackend->originLng(), seadBackend->originAlt());
+    _qmlAppEngine->rootContext()->setContextProperty("AirZonesBackend", airZonesBackend);
 
     QGCCorePlugin::instance()->createRootWindow(_qmlAppEngine);
 

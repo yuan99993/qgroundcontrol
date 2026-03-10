@@ -32,7 +32,8 @@ Window {
         const lat = txtOriginLat.text.trim().length > 0 ? Number(txtOriginLat.text) : NaN
         const lng = txtOriginLng.text.trim().length > 0 ? Number(txtOriginLng.text) : NaN
         const alt = txtOriginAlt.text.trim().length > 0 ? Number(txtOriginAlt.text) : 0
-        SeadBackend.setOrigin(lat, lng, alt)
+        SeadBackend.setOrigin(lat, lng, alt)    //更新经纬度到SEAD代码后端
+        AirZonesBackend.qmlSetOrigin(lat, lng, alt)     //更新经纬度到禁飞区代码后端
     }
 
     //日志栏显示ID和MAC地址
@@ -60,6 +61,7 @@ Window {
         }
     }
 
+    //将前端文本框中输入的ID和MAC传给后端
     function applyXbeeRouteFromInputs() {
         const id = Number(txtRouteId.text)
         const mac = txtRouteMac.text.trim()
@@ -322,12 +324,12 @@ Window {
             TaskButton {
                 text: "禁飞区下发"
                 borderColor: "#e67e22"
-                onClicked: SeadBackend.uploadZones()
+                onClicked: AirZonesBackend.qmlUploadZones(SeadBackend.targetUavId)
             }
             TaskButton {
                 text: "禁飞区保存"
                 borderColor: "#ff4b4b"
-                onClicked: SeadBackend.saveZonesToFile()
+                onClicked: AirZonesBackend.qmlFinalizeCurrentZone()
             }
         }
 

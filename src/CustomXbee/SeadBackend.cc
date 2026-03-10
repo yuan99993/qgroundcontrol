@@ -34,15 +34,11 @@ SeadBackend::SeadBackend(MissionControl* missionControl, QObject* parent)
     _originLat = origin.lat;
     _originLng = origin.lng;
     _originAlt = origin.alt;
-    _airZones.setMissionControl(_missionControl);
-    _airZones.setOrigin(_originLat, _originLng, _originAlt);
-    _syncZonePoints();
 }
 
 void SeadBackend::setMissionControl(MissionControl* missionControl)
 {
     _missionControl = missionControl;
-    _airZones.setMissionControl(_missionControl);
 }
 
 void SeadBackend::setTargetUavId(int id)
@@ -97,7 +93,6 @@ void SeadBackend::setOriginLat(double lat)
     }
     _originLat = lat;
     PacketProtocol::setOrigin(_originLat, _originLng, _originAlt);
-    _airZones.setOrigin(_originLat, _originLng, _originAlt);
     emit configChanged();
 }
 
@@ -108,7 +103,6 @@ void SeadBackend::setOriginLng(double lng)
     }
     _originLng = lng;
     PacketProtocol::setOrigin(_originLat, _originLng, _originAlt);
-    _airZones.setOrigin(_originLat, _originLng, _originAlt);
     emit configChanged();
 }
 
@@ -119,7 +113,6 @@ void SeadBackend::setOriginAlt(double alt)
     }
     _originAlt = alt;
     PacketProtocol::setOrigin(_originLat, _originLng, _originAlt);
-    _airZones.setOrigin(_originLat, _originLng, _originAlt);
     emit configChanged();
 }
 
@@ -154,19 +147,10 @@ void SeadBackend::insertTask(QGeoCoordinate coord)
     _missionControl->sendCustomPayload(_targetUavId, packet, "TASK_INSERT");
 }
 
-void SeadBackend::addZoneVertex(QGeoCoordinate coord)
-{
-    _airZones.addZoneVertex(coord);
-    _syncZonePoints();
-    emit configChanged();
-}
-
-void SeadBackend::clearAll()
+void SeadBackend::clearAllSeadPoints()
 {
     _missionPoints.clearAndDeleteContents();
     _insertPoints.clearAndDeleteContents();
-    _airZones.clearAllZones();
-    _syncZonePoints();
     emit configChanged();
 }
 
@@ -185,7 +169,6 @@ bool SeadBackend::setOrigin(double lat, double lng, double alt)
     _originLng = lng;
     _originAlt = alt;
     PacketProtocol::setOrigin(_originLat, _originLng, _originAlt);  //传经纬度给打包后端
-    _airZones.setOrigin(_originLat, _originLng, _originAlt);
 
     if (changed) {
         emit configChanged();
@@ -229,23 +212,6 @@ void SeadBackend::sendSeadMission()
     if (_missionControl->sendCustomPayload(_targetUavId, packet, "SEAD_MISSION")) {
         _log(QString(">> SEAD mission sent, targets=%1").arg(_missionPoints.count()));
     }
-}
-
-void SeadBackend::uploadZones()
-{
-    _airZones.uploadZones(_targetUavId);
-}
-
-void SeadBackend::saveZonesToFile()
-{
-    _airZones.finalizeCurrentZone();
-    _syncZonePoints();
-    emit configChanged();
-}
-
-QVariantList SeadBackend::getZonePolygons() const
-{
-    return _airZones.zonePolygons();
 }
 
 QByteArray SeadBackend::_buildTaskInsertPacket(int targetId, const QGeoCoordinate& coord, int taskType) const
@@ -371,19 +337,5 @@ void SeadBackend::_log(const QString& msg) const
 {
     if (_missionControl) {
         _missionControl->appendLogMessage(msg);
-    }
-}
-
-void SeadBackend::_syncZonePoints()
-{
-    _zonePoints.clearAndDeleteContents();
-
-    QmlObjectListModel* source = _airZones.zonePoints();
-    for (int i = 0; i < source->count(); ++i) {
-        AirZonePointItem* item = qobject_cast<AirZonePointItem*>(source->get(i));
-        if (!item) {
-            continue;
-        }
-        _zonePoints.append(new SeadMapPointItem(item->coordinate()));
     }
 }
