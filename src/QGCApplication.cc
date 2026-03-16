@@ -46,6 +46,7 @@
 #include "CustomXbee/MissionControl.h" // 引用你的新类
 #include "CustomXbee/SeadBackend.h"
 #include "CustomXbee/AirZonesBackend.h"
+#include "CustomXbee/VrpBackend.h"
 
 #ifndef QGC_NO_SERIAL_LINK
 #include "SerialLink.h"
@@ -272,6 +273,10 @@ void QGCApplication::_initForNormalAppBoot()
     airZonesBackend->setMissionControl(missionControl);     //传missionControl是因为要用内部方法
     airZonesBackend->setOrigin(seadBackend->originLat(), seadBackend->originLng(), seadBackend->originAlt());
     _qmlAppEngine->rootContext()->setContextProperty("AirZonesBackend", airZonesBackend);
+    VrpBackend* vrpBackend = new VrpBackend(this);
+    vrpBackend->setMissionControl(missionControl);
+    vrpBackend->setOrigin(seadBackend->originLat(), seadBackend->originLng(), seadBackend->originAlt());
+    _qmlAppEngine->rootContext()->setContextProperty("VrpBackend", vrpBackend);
 
     QGCCorePlugin::instance()->createRootWindow(_qmlAppEngine);
 

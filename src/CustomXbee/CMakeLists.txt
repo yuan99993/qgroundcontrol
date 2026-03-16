@@ -7,4 +7,6 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     AirZonesBackend.h
     SeadBackend.cc
     SeadBackend.h
+    VrpBackend.cc
+    VrpBackend.h
 )

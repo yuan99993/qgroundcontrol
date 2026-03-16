@@ -100,6 +100,23 @@ QVariantList MissionControl::getXbeeRoutes() const
     return list;
 }
 
+QVariantList MissionControl::getActiveUavEnuStates() const
+{
+    QVariantList list;
+    QList<int> keys = _uavTable.keys();
+    std::sort(keys.begin(), keys.end());
+    for (int id : keys) {
+        const QVariantMap row = _uavTable.value(id);
+        QVariantMap item;
+        item["id"] = id;
+        item["e"] = row.value("e").toDouble();
+        item["n"] = row.value("n").toDouble();
+        item["u"] = row.value("u").toDouble();
+        list.append(item);
+    }
+    return list;
+}
+
 void MissionControl::connectUdp(QString ip, int port)
 {
     disconnectAll();

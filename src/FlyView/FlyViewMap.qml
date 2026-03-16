@@ -1,4 +1,4 @@
-﻿import QtQuick
+import QtQuick
 import QtQuick.Controls
 import QtLocation
 import QtPositioning
@@ -912,10 +912,14 @@ FlightMap {
             text: "增加禁飞区顶点"
             onTriggered: AirZonesBackend.qmlAddZoneVertex(seadContextMenu.clickCoordinate)
         }
+        QGCMenuItem {
+            text: "增加VRP目标点"
+            onTriggered: VrpBackend.addVrpPointWithAlt(seadContextMenu.clickCoordinate, VrpBackend.draftPointAlt)
+        }
         QGCMenuSeparator { }
         QGCMenuItem {
             text: "清除所有点位"
-            onTriggered: { SeadBackend.clearAllSeadPoints();/*SEAD点清理*/ AirZonesBackend.qmlClearAllZones(); /*禁飞区清理*/}
+            onTriggered: { SeadBackend.clearAllSeadPoints();/*SEAD点清理*/ AirZonesBackend.qmlClearAllZones(); /*禁飞区清理*/ VrpBackend.clearAllVrpPoints();}
         }
     }
 
@@ -923,7 +927,7 @@ FlightMap {
 
     // src/FlyView/FlyViewMap.qml
 
-    // --- 1. SEAD 初始任务点 (黄色) ---
+    // --- SEAD 任务点 (黄色) ---
     MapItemView {
         model: SeadBackend.missionPoints
         delegate: MapQuickItem {
@@ -931,13 +935,18 @@ FlightMap {
             anchorPoint:    Qt.point(sourceItem.width/2, sourceItem.height/2)
             z:              QGroundControl.zOrderMapItems
             sourceItem: Rectangle {
-                width: 14; height: 14; color: "yellow"; radius: 7; border.color: "black"
-                QGCLabel { text: "S"; anchors.centerIn: parent; font.pixelSize: 10; color: "black" }
+                width: 20; height: 20; color: "yellow"; radius: 10; border.color: "black"
+                QGCLabel {
+                    text: (typeof index !== "undefined") ? String(index + 1) : "?"
+                    anchors.centerIn: parent
+                    font.pixelSize: 10
+                    color: "black"
+                }
             }
         }
     }
 
-    // --- 2. 中途插入点 (浅蓝色) ---
+    // --- 中途插入点 (蓝色) ---
     MapItemView {
         model: SeadBackend.insertPoints
         delegate: MapQuickItem {
@@ -945,13 +954,32 @@ FlightMap {
             anchorPoint:    Qt.point(sourceItem.width/2, sourceItem.height/2)
             z:              QGroundControl.zOrderMapItems
             sourceItem: Rectangle {
-                width: 14; height: 14; color: "lightblue"; radius: 7; border.color: "black"
+                width: 14; height: 14; color: "#3700ff"; radius: 7; border.color: "black"
                 QGCLabel { text: "I"; anchors.centerIn: parent; font.pixelSize: 10; color: "black" }
             }
         }
     }
 
-    // --- 3. 禁飞区边界点 (红色) ---
+    // --- VRP 任务点 (浅蓝色) ---
+    MapItemView {
+        model: VrpBackend.vrpPoints
+        delegate: MapQuickItem {
+            coordinate:     object.coordinate
+            anchorPoint:    Qt.point(sourceItem.width/2, sourceItem.height/2)
+            z:              QGroundControl.zOrderMapItems
+            sourceItem: Rectangle {
+                width: 20; height: 20; color: "#00ffea"; radius: 10; border.color: "white"
+                QGCLabel {
+                    text: (typeof index !== "undefined") ? String(index + 1) : "?"
+                    anchors.centerIn: parent
+                    font.pixelSize: 10
+                    color: "black"
+                }
+            }
+        }
+    }
+
+    // --- 禁飞区边界点 (红色) ---
     MapItemView {
         model: AirZonesBackend.zonePoints
         delegate: MapQuickItem {
@@ -959,7 +987,7 @@ FlightMap {
             anchorPoint:    Qt.point(sourceItem.width/2, sourceItem.height/2)
             z:              QGroundControl.zOrderMapItems
             sourceItem: Rectangle {
-                width: 12; height: 12; color: "red"; radius: 6; border.color: "white"
+                width: 12; height: 12; color: "#ff1100"; radius: 6; border.color: "white"
             }
         }
     }

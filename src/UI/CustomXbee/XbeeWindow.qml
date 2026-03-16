@@ -8,9 +8,9 @@ import QGroundControl.Controls
 Window {
     id: root
     width: 250
-    height: 355
+    height: 380
     minimumWidth: 250
-    minimumHeight: 355
+    minimumHeight: 380
     title: "SEAD Control"
     visible: true
     color: "#1A1A1A"
@@ -34,6 +34,18 @@ Window {
         const alt = txtOriginAlt.text.trim().length > 0 ? Number(txtOriginAlt.text) : 0
         SeadBackend.setOrigin(lat, lng, alt)    //更新经纬度到SEAD代码后端
         AirZonesBackend.qmlSetOrigin(lat, lng, alt)     //更新经纬度到禁飞区代码后端
+        VrpBackend.qmlSetOrigin(lat, lng, alt)      //更新经纬度到VRP代码后端
+    }
+
+    //把输入框的数据作为VRP的高度值
+    function applyVrpAltInput() {
+        const alt = Number(txtVrpAlt.text)
+        if (!isFinite(alt)) {
+            return false
+        }
+
+        VrpBackend.draftPointAlt = alt
+        return true
     }
 
     //日志栏显示ID和MAC地址
@@ -88,12 +100,12 @@ Window {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 7
-        spacing: 6
+        anchors.margins: 5
+        spacing: 5
 
         RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: 30
+            Layout.preferredHeight: 25
             spacing: 5
 
             ComboBox {
@@ -157,8 +169,8 @@ Window {
                     id: txtRouteId
                     text: ""
                     placeholderText: "ID"
-                    Layout.preferredWidth: 56
-                    Layout.preferredHeight: 27
+                    Layout.preferredWidth: 55
+                    Layout.preferredHeight: 25
                     font.pointSize: 8
                     leftPadding: 4
                     onEditingFinished: root.queryXbeeRouteById()
@@ -168,14 +180,14 @@ Window {
                     text: ""
                     placeholderText: "MAC Address"
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 27
+                    Layout.preferredHeight: 25
                     font.pointSize: 8
                     leftPadding: 4
                 }
                 Button {
                     text: "Save"
                     Layout.preferredWidth: 50
-                    Layout.preferredHeight: 27
+                    Layout.preferredHeight: 25
                     font.pointSize: 8
                     onClicked: root.applyXbeeRouteFromInputs()
                 }
@@ -200,7 +212,7 @@ Window {
                         id: txtIp
                         text: "192.168.129.128"
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 27
+                        Layout.preferredHeight: 25
                         font.pointSize: 8
                         leftPadding: 4
                     }
@@ -209,7 +221,7 @@ Window {
                         id: txtPort
                         text: "14500"
                         Layout.preferredWidth: 50
-                        Layout.preferredHeight: 27
+                        Layout.preferredHeight: 25
                         font.pointSize: 8
                         leftPadding: 4
                     }
@@ -222,7 +234,7 @@ Window {
                         id: cmbPort
                         model: MissionControl.getSerialPorts()
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 27
+                        Layout.preferredHeight: 25
                         font.pointSize: 8
                     }
                 }
@@ -245,8 +257,8 @@ Window {
                     id: txtOriginLat
                     text: isFinite(SeadBackend.originLat) ? SeadBackend.originLat.toFixed(6) : ""
                     placeholderText: "lat"
-                    Layout.preferredWidth: 53
-                    Layout.preferredHeight: 27
+                    Layout.preferredWidth: 55
+                    Layout.preferredHeight: 25
                     font.pointSize: 8
                     leftPadding: 4
                     //onEditingFinished: root.applyOriginFromInputs()   //这个会触发不选择文本框就触发一次设置
@@ -255,8 +267,8 @@ Window {
                     id: txtOriginLng
                     text: isFinite(SeadBackend.originLng) ? SeadBackend.originLng.toFixed(6) : ""
                     placeholderText: "lng"
-                    Layout.preferredWidth: 53
-                    Layout.preferredHeight: 27
+                    Layout.preferredWidth: 55
+                    Layout.preferredHeight: 25
                     font.pointSize: 8
                     leftPadding: 4
                     //onEditingFinished: root.applyOriginFromInputs()
@@ -265,8 +277,8 @@ Window {
                     id: txtOriginAlt
                     text: isFinite(SeadBackend.originAlt) ? SeadBackend.originAlt.toFixed(1) : ""
                     placeholderText: "alt"
-                    Layout.preferredWidth: 37
-                    Layout.preferredHeight: 27
+                    Layout.preferredWidth: 35
+                    Layout.preferredHeight: 25
                     font.pointSize: 8
                     leftPadding: 4
                     //onEditingFinished: root.applyOriginFromInputs()
@@ -274,20 +286,48 @@ Window {
                 Button {
                     text: "Set"
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 27
+                    Layout.preferredHeight: 25
                     font.pointSize: 8
                     onClicked: root.applyOriginFromInputs()
                 }
             }
         }
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 30
+            color: "#252525"
+            radius: 2
 
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: 2
+                spacing: 4
+
+                Text { text: "VRP Alt(rel):"; color: "#aaa"; font.pointSize: 8 }
+                TextField {
+                    id: txtVrpAlt
+                    text: Number(VrpBackend.draftPointAlt).toFixed(1)
+                    placeholderText: "rel m"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 25
+                    font.pointSize: 8
+                    leftPadding: 4
+                    onTextChanged: root.applyVrpAltInput()
+                    onEditingFinished: {
+                        if (!root.applyVrpAltInput()) {
+                            txtVrpAlt.text = Number(VrpBackend.draftPointAlt).toFixed(1)
+                        }
+                    }
+                }
+                }
+        }
         GridLayout {
             columns: 2
-            rows: 2
+            rows: 3
             Layout.fillWidth: true
-            Layout.preferredHeight: 80
-            columnSpacing: 7
-            rowSpacing: 7
+            Layout.preferredHeight: 115
+            columnSpacing: 5
+            rowSpacing: 5
 
             component TaskButton: Button {
                 property color borderColor: "white"
@@ -324,12 +364,22 @@ Window {
             TaskButton {
                 text: "禁飞区下发"
                 borderColor: "#e67e22"
-                onClicked: AirZonesBackend.qmlUploadZones(SeadBackend.targetUavId)
+                onClicked: AirZonesBackend.qmlUploadZones(SeadBackend.targetUavId)  //
             }
             TaskButton {
                 text: "禁飞区保存"
                 borderColor: "#ff4b4b"
                 onClicked: AirZonesBackend.qmlFinalizeCurrentZone()
+            }
+            TaskButton {
+                text: "VRP下发"
+                borderColor: "#9b59b6"
+                onClicked: VrpBackend.uploadVrpResult(SeadBackend.waypointRadius)
+            }
+            TaskButton {
+                text: "VRP分配"
+                borderColor: "#16a085"
+                onClicked: VrpBackend.runVrpAllocation()
             }
         }
 
