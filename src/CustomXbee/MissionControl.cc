@@ -295,7 +295,7 @@ void MissionControl::sendMode(int id, QString mode)
 
     const QByteArray pkt = PacketProtocol::packCommand(id, ProtocolEnum::Mode_Change, mEnum);
     if (sendPayload(id, pkt)) {
-        _logCommandSent(QString("SET %1").arg(mode), id);
+        _logCommandSent(QString("SET OFFBOARD"), id);
     }
 }
 
