@@ -1,13 +1,20 @@
 ﻿#include "VrpBackend.h"
 
 #include <QDataStream>
+#include <QHash>
+#include <QRandomGenerator>
 #include <QVariantMap>
+#include <QtGlobal>
 #include <algorithm>
 #include <cmath>
 #include <limits>
 
 namespace {
-constexpr double kBalanceWeight = 0.15;
+constexpr int kPopulationSize = 300;
+constexpr int kCrossoverNum = 200;
+constexpr int kMutationNum = 96;
+constexpr int kElitismNum = 4;
+constexpr int kIterationTimes = 100;
 }
 
 VrpBackend::VrpBackend(QObject* parent)
@@ -101,9 +108,33 @@ bool VrpBackend::runVrpAllocation()
         return false;
     }
 
+    struct UavState {
+        int id = 0;
+        ProtocolPointENU startPos {0.0, 0.0, 0.0};
+    };
+
+    QVector<UavState> uavStates;
+    uavStates.reserve(uavs.size());
+    for (const QVariant& item : uavs) {
+        const QVariantMap row = item.toMap();
+        UavState state;
+        state.id = row.value("id").toInt();
+        state.startPos.e = row.value("e").toDouble();
+        state.startPos.n = row.value("n").toDouble();
+        state.startPos.u = row.value("u").toDouble();
+        uavStates.push_back(state);
+    }
+
+    const int uavCount = uavStates.size();
+    const int targetCount = _targets.size();
+    if (uavCount <= 0 || targetCount <= 0) {
+        _log(">> VRP allocate failed: empty UAVs or targets.");
+        return false;
+    }
+
     QVector<ProtocolPointENU> targetsEnu;
-    targetsEnu.reserve(_targets.size());
-    for (int i = 0; i < _targets.size(); ++i) {
+    targetsEnu.reserve(targetCount);
+    for (int i = 0; i < targetCount; ++i) {
         const QGeoCoordinate& coord = _targets[i];
         const double relAlt = (i < _targetRelAlts.size() && std::isfinite(_targetRelAlts[i])) ? _targetRelAlts[i] : 0.0;
         const QGeoCoordinate coordWithAbsAlt(coord.latitude(), coord.longitude(), _originAlt + relAlt);
@@ -116,64 +147,305 @@ bool VrpBackend::runVrpAllocation()
         targetsEnu.push_back(enu);
     }
 
-    _assignedRoutes.clear();
-    _assignedRoutes.reserve(uavs.size());
-    for (const QVariant& item : uavs) {
-        const QVariantMap row = item.toMap();
-        AssignedRoute route;
-        route.uavId = row.value("id").toInt();
-        route.lastPos.e = row.value("e").toDouble();
-        route.lastPos.n = row.value("n").toDouble();
-        route.lastPos.u = row.value("u").toDouble();
-        _assignedRoutes.push_back(route);
+    QVector<QVector<double>> baseCost(targetCount + 1, QVector<double>(targetCount + 1, 0.0));
+    for (int i = 1; i <= targetCount; ++i) {
+        for (int j = 1; j <= targetCount; ++j) {
+            baseCost[i][j] = _distance2d(targetsEnu[i - 1], targetsEnu[j - 1]);
+        }
     }
 
-    QVector<int> unassigned;
-    unassigned.reserve(targetsEnu.size());
-    for (int i = 0; i < targetsEnu.size(); ++i) {
-        unassigned.push_back(i);
+    QVector<QVector<QVector<double>>> costTables(
+        uavCount, QVector<QVector<double>>(targetCount + 1, QVector<double>(targetCount + 1, 0.0)));
+    for (int u = 0; u < uavCount; ++u) {
+        costTables[u] = baseCost;
+        for (int t = 1; t <= targetCount; ++t) {
+            const double d = _distance2d(uavStates[u].startPos, targetsEnu[t - 1]);
+            costTables[u][0][t] = d;
+            costTables[u][t][0] = d;
+        }
     }
 
-    while (!unassigned.isEmpty()) {
-        int bestRouteIdx = -1;
-        int bestTargetIdx = -1;
-        double bestScore = std::numeric_limits<double>::infinity();
+    QHash<int, int> uavIdToIndex;
+    QVector<int> uavIds;
+    uavIds.reserve(uavCount);
+    for (int i = 0; i < uavCount; ++i) {
+        uavIdToIndex.insert(uavStates[i].id, i);
+        uavIds.push_back(uavStates[i].id);
+    }
 
-        for (int r = 0; r < _assignedRoutes.size(); ++r) {
-            const AssignedRoute& route = _assignedRoutes[r];
-            for (int idx : unassigned) {
-                const double dist = _distance2d(route.lastPos, targetsEnu[idx]);
-                const double score = dist + route.routeDistance * kBalanceWeight;
-                if (score < bestScore) {
-                    bestScore = score;
-                    bestRouteIdx = r;
-                    bestTargetIdx = idx;
+    struct GAChromosome {
+        QVector<int> orderGene;
+        QVector<int> assignGene;
+        double fitness = 0.0;
+        double weight = 0.0;
+    };
+
+    auto randInt = [](int maxExclusive) -> int {
+        return (maxExclusive > 0) ? QRandomGenerator::global()->bounded(maxExclusive) : 0;
+    };
+    auto randProb = []() -> double {
+        return QRandomGenerator::global()->generateDouble();
+    };
+
+    auto makeInitialPopulation = [&]() -> QVector<GAChromosome> {
+        QVector<GAChromosome> population;
+        population.reserve(kPopulationSize);
+        for (int i = 0; i < kPopulationSize; ++i) {
+            GAChromosome c;
+            c.orderGene.resize(targetCount);
+            c.assignGene.resize(targetCount);
+
+            for (int j = 0; j < targetCount; ++j) {
+                c.orderGene[j] = j + 1;
+            }
+            for (int j = targetCount - 1; j > 0; --j) {
+                const int k = randInt(j + 1);
+                qSwap(c.orderGene[j], c.orderGene[k]);
+            }
+
+            for (int j = 0; j < targetCount; ++j) {
+                c.assignGene[j] = uavIds[randInt(uavCount)];
+            }
+
+            population.push_back(c);
+        }
+        return population;
+    };
+
+    auto evaluateFitness = [&](QVector<GAChromosome>& population) {
+        double fitnessSum = 0.0;
+
+        for (GAChromosome& c : population) {
+            QVector<int> uavState(uavCount, 0);
+            QVector<double> uavCost(uavCount, 0.0);
+
+            for (int j = 0; j < targetCount; ++j) {
+                const int uavId = c.assignGene[j];
+                const int uavIdx = uavIdToIndex.value(uavId, -1);
+                const int target = c.orderGene[j];
+                if (uavIdx < 0 || target < 1 || target > targetCount) {
+                    continue;
+                }
+
+                uavCost[uavIdx] += costTables[uavIdx][uavState[uavIdx]][target];
+                uavState[uavIdx] = target;
+            }
+
+            for (int u = 0; u < uavCount; ++u) {
+                uavCost[u] += costTables[u][uavState[u]][0];
+            }
+
+            const double maxCost = *std::max_element(uavCost.begin(), uavCost.end());
+            c.fitness = (maxCost > 1e-9) ? (1.0 / maxCost) : 1e9;
+            fitnessSum += c.fitness;
+        }
+
+        if (fitnessSum <= 1e-12) {
+            const double step = 1.0 / qMax(1, population.size());
+            double acc = 0.0;
+            for (GAChromosome& c : population) {
+                acc += step;
+                c.weight = acc;
+            }
+            return;
+        }
+
+        double acc = 0.0;
+        for (GAChromosome& c : population) {
+            acc += (c.fitness / fitnessSum);
+            c.weight = acc;
+        }
+    };
+
+    auto selectRoulette = [&](const QVector<GAChromosome>& population, int count) -> QVector<GAChromosome> {
+        QVector<GAChromosome> selected;
+        selected.reserve(count);
+        for (int i = 0; i < count; ++i) {
+            const double p = randProb();
+            bool found = false;
+            for (const GAChromosome& c : population) {
+                if (c.weight >= p) {
+                    selected.push_back(c);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found && !population.isEmpty()) {
+                selected.push_back(population.last());
+            }
+        }
+        return selected;
+    };
+
+    auto crossover = [&](const GAChromosome& parent1, const GAChromosome& parent2) -> QVector<GAChromosome> {
+        GAChromosome offspring1;
+        GAChromosome offspring2;
+        offspring1.orderGene = QVector<int>(targetCount, 0);
+        offspring1.assignGene = QVector<int>(targetCount, 0);
+        offspring2.orderGene = QVector<int>(targetCount, 0);
+        offspring2.assignGene = QVector<int>(targetCount, 0);
+
+        int cut0 = randInt(targetCount);
+        int cut1 = randInt(targetCount);
+        if (cut0 > cut1) {
+            std::swap(cut0, cut1);
+        }
+
+        for (int k = cut0; k < cut1; ++k) {
+            offspring2.orderGene[k] = parent1.orderGene[k];
+            offspring2.assignGene[k] = parent1.assignGene[k];
+            offspring1.orderGene[k] = parent2.orderGene[k];
+            offspring1.assignGene[k] = parent2.assignGene[k];
+        }
+
+        for (int i = 0; i < targetCount; ++i) {
+            if (!offspring1.orderGene.contains(parent1.orderGene[i])) {
+                const int idx = offspring1.orderGene.indexOf(0);
+                if (idx >= 0) {
+                    offspring1.orderGene[idx] = parent1.orderGene[i];
+                    offspring1.assignGene[idx] = parent1.assignGene[i];
+                }
+            }
+            if (!offspring2.orderGene.contains(parent2.orderGene[i])) {
+                const int idx = offspring2.orderGene.indexOf(0);
+                if (idx >= 0) {
+                    offspring2.orderGene[idx] = parent2.orderGene[i];
+                    offspring2.assignGene[idx] = parent2.assignGene[i];
                 }
             }
         }
 
-        if (bestRouteIdx < 0 || bestTargetIdx < 0) {
-            _log(">> VRP allocate failed: internal selection error.");
-            _assignedRoutes.clear();
+        return {offspring1, offspring2};
+    };
+
+    auto mutate = [&](const GAChromosome& in) -> GAChromosome {
+        GAChromosome out = in;
+        if (targetCount <= 0) {
+            return out;
+        }
+
+        if (randProb() > 0.5) {
+            const int idx = randInt(targetCount);
+            out.assignGene[idx] = uavIds[randInt(uavCount)];
+        } else {
+            int rev0 = randInt(targetCount);
+            int rev1 = randInt(targetCount);
+            if (rev0 > rev1) {
+                std::swap(rev0, rev1);
+            }
+            if (rev1 > rev0) {
+                std::reverse(out.orderGene.begin() + rev0, out.orderGene.begin() + rev1);
+                std::reverse(out.assignGene.begin() + rev0, out.assignGene.begin() + rev1);
+            }
+        }
+        return out;
+    };
+
+    auto elitism = [&](const QVector<GAChromosome>& population) -> QVector<GAChromosome> {
+        QVector<GAChromosome> sorted = population;
+        std::sort(sorted.begin(), sorted.end(), [](const GAChromosome& a, const GAChromosome& b) {
+            return a.fitness > b.fitness;
+        });
+        const int takeN = qMin(kElitismNum, sorted.size());
+        QVector<GAChromosome> out;
+        out.reserve(takeN);
+        for (int i = 0; i < takeN; ++i) {
+            out.push_back(sorted[i]);
+        }
+        return out;
+    };
+
+    QVector<GAChromosome> population = makeInitialPopulation();
+    if (population.isEmpty()) {
+        _log(">> VRP allocate failed: population init failed.");
+        return false;
+    }
+    evaluateFitness(population);
+
+    for (int iter = 0; iter < kIterationTimes; ++iter) {
+        QVector<GAChromosome> nextPopulation;
+        nextPopulation.reserve(kPopulationSize);
+
+        const QVector<GAChromosome> elites = elitism(population);
+        for (const GAChromosome& c : elites) {
+            nextPopulation.push_back(c);
+        }
+
+        for (int j = 0; j < kCrossoverNum; j += 2) {
+            const QVector<GAChromosome> parents = selectRoulette(population, 2);
+            if (parents.size() < 2) {
+                break;
+            }
+            const QVector<GAChromosome> children = crossover(parents[0], parents[1]);
+            for (const GAChromosome& c : children) {
+                nextPopulation.push_back(c);
+            }
+        }
+
+        for (int j = 0; j < kMutationNum; ++j) {
+            const QVector<GAChromosome> parent = selectRoulette(population, 1);
+            if (parent.isEmpty()) {
+                break;
+            }
+            nextPopulation.push_back(mutate(parent[0]));
+        }
+
+        if (nextPopulation.isEmpty()) {
+            _log(">> VRP allocate failed: next population empty.");
             return false;
         }
 
-        AssignedRoute& route = _assignedRoutes[bestRouteIdx];
-        const ProtocolPointENU targetEnu = targetsEnu[bestTargetIdx];
-        route.routeDistance += _distance2d(route.lastPos, targetEnu);
-        route.lastPos = targetEnu;
-        route.targetIndices.push_back(bestTargetIdx);
-        route.pointsEnu.push_back(targetEnu);
-
-        const auto eraseIt = std::find(unassigned.begin(), unassigned.end(), bestTargetIdx);
-        if (eraseIt != unassigned.end()) {
-            unassigned.erase(eraseIt);
+        while (nextPopulation.size() > kPopulationSize) {
+            nextPopulation.removeLast();
         }
+        while (nextPopulation.size() < kPopulationSize) {
+            nextPopulation.push_back(population[randInt(population.size())]);
+        }
+
+        population = nextPopulation;
+        evaluateFitness(population);
     }
 
-    _log(QString(">> VRP allocated: targets=%1 uavs=%2")
+    const auto bestIt = std::max_element(population.begin(), population.end(), [](const GAChromosome& a, const GAChromosome& b) {
+        return a.fitness < b.fitness;
+    });
+    if (bestIt == population.end()) {
+        _log(">> VRP allocate failed: no best chromosome.");
+        return false;
+    }
+
+    _assignedRoutes.clear();
+    _assignedRoutes.reserve(uavCount);
+    QHash<int, int> uavIdToRoute;
+    for (int i = 0; i < uavCount; ++i) {
+        AssignedRoute route;
+        route.uavId = uavStates[i].id;
+        route.lastPos = uavStates[i].startPos;
+        _assignedRoutes.push_back(route);
+        uavIdToRoute.insert(route.uavId, i);
+    }
+
+    const GAChromosome& best = *bestIt;
+    for (int j = 0; j < targetCount; ++j) {
+        const int targetIdx = best.orderGene[j] - 1;
+        const int uavId = best.assignGene[j];
+        const int routeIdx = uavIdToRoute.value(uavId, -1);
+        if (routeIdx < 0 || targetIdx < 0 || targetIdx >= targetsEnu.size()) {
+            continue;
+        }
+
+        AssignedRoute& route = _assignedRoutes[routeIdx];
+        const ProtocolPointENU targetEnu = targetsEnu[targetIdx];
+        route.routeDistance += _distance2d(route.lastPos, targetEnu);
+        route.lastPos = targetEnu;
+        route.targetIndices.push_back(targetIdx);
+        route.pointsEnu.push_back(targetEnu);
+    }
+
+    _log(QString(">> VRP allocated(GA): targets=%1 uavs=%2 iter=%3")
              .arg(_targets.size())
-             .arg(_assignedRoutes.size()));
+             .arg(_assignedRoutes.size())
+             .arg(kIterationTimes));
 
     for (const AssignedRoute& route : _assignedRoutes) {
         QStringList labels;
@@ -316,7 +588,3 @@ void VrpBackend::_log(const QString& msg) const
         _missionControl->appendLogMessage(msg);
     }
 }
-
-
-
-
