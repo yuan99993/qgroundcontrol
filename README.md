@@ -2,7 +2,7 @@
  * @Author: your name
  * @Date: 2026-01-29 20:21:04
  * @LastEditors: your name
- * @LastEditTime: 2026-03-04 16:35:38
+ * @LastEditTime: 2026-03-16 22:59:35
  * @Description:
  * @FilePath: \qgroundcontrol\README.md
 -->
@@ -17,6 +17,6 @@
   </a>
 </p>
 
-*重新基于QGC做出的部分二次开发功能,可运行版本，禁飞区功能还未完善*.
+*重新基于QGC做出的部分二次开发功能,可运行版本*.
 
 
