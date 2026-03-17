@@ -80,7 +80,7 @@ private:
     double _originLat = std::numeric_limits<double>::quiet_NaN();
     double _originLng = std::numeric_limits<double>::quiet_NaN();
     double _originAlt = std::numeric_limits<double>::quiet_NaN();
-    double _draftPointAlt = 0.0;
+    double _draftPointAlt = 10.0;       //VRP功能的高度值
 };
 
 

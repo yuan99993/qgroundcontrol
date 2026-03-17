@@ -48,6 +48,17 @@ Window {
         return true
     }
 
+    //把输入框的数据作为半径值，SEAD和VRP下发共用
+    function applyWaypointRadiusInput() {
+        const radius = Number(txtWaypointRadius.text)
+        if (!Number.isInteger(radius) || radius < 1 || radius > 255) {
+            return false
+        }
+
+        SeadBackend.waypointRadius = radius
+        return true
+    }
+
     //日志栏显示ID和MAC地址
     function formatXbeeRoutesForLog() {
         const routes = MissionControl.getXbeeRoutes()
@@ -303,23 +314,49 @@ Window {
                 anchors.margins: 2
                 spacing: 4
 
-                Text { text: "VRP Alt(rel):"; color: "#aaa"; font.pointSize: 8 }
-                TextField {
-                    id: txtVrpAlt
-                    text: Number(VrpBackend.draftPointAlt).toFixed(1)
-                    placeholderText: "rel m"
+                RowLayout {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 25
-                    font.pointSize: 8
-                    leftPadding: 4
-                    onTextChanged: root.applyVrpAltInput()
-                    onEditingFinished: {
-                        if (!root.applyVrpAltInput()) {
-                            txtVrpAlt.text = Number(VrpBackend.draftPointAlt).toFixed(1)
+                    spacing: 2
+                    Text { text: "VRP Alt:"; color: "#aaa"; font.pointSize: 8 }
+                    TextField {
+                        id: txtVrpAlt
+                        text: Number(VrpBackend.draftPointAlt).toFixed(1)
+                        placeholderText: "rel m"
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 25
+                        font.pointSize: 8
+                        leftPadding: 4
+                        onTextChanged: root.applyVrpAltInput()
+                        onEditingFinished: {
+                            if (!root.applyVrpAltInput()) {
+                                txtVrpAlt.text = Number(VrpBackend.draftPointAlt).toFixed(1)
+                            }
                         }
                     }
                 }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 2
+                    Text { text: "Radius:"; color: "#aaa"; font.pointSize: 8 }
+                    TextField {
+                        id: txtWaypointRadius
+                        text: String(SeadBackend.waypointRadius)
+                        placeholderText: "m"
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 25
+                        font.pointSize: 8
+                        leftPadding: 4
+                        validator: IntValidator { bottom: 1; top: 255 }     //范围验证，只能输入1-255的整数，因为发包中半径这个数据包只占了一个字节
+                        onTextChanged: root.applyWaypointRadiusInput()
+                        onEditingFinished: {
+                            if (!root.applyWaypointRadiusInput()) {
+                                txtWaypointRadius.text = String(SeadBackend.waypointRadius)
+                            }
+                        }
+                    }
                 }
+            }
         }
         GridLayout {
             columns: 2
