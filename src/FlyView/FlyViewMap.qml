@@ -1070,12 +1070,29 @@ FlightMap {
         anchors.bottom: parent.bottom
         anchors.leftMargin: ScreenTools.defaultFontPixelWidth * 0.8
         anchors.bottomMargin: ScreenTools.defaultFontPixelHeight * 0.8
-        width: ScreenTools.defaultFontPixelWidth * 25
+        width: ScreenTools.defaultFontPixelWidth * 30
         height: ScreenTools.defaultFontPixelHeight * 7
         z: QGroundControl.zOrderTopMost
         radius: 3
         color: "#CC000000"
         border.color: "#333333"
+
+        //确保鼠标滚轮在日志栏位置滚动时地图不会缩放
+        WheelHandler {
+            id: flyLogWheel
+            target: null
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            onWheel: function(event) {
+                var deltaY = event.angleDelta.y
+                if (deltaY === 0 && event.pixelDelta) {
+                    deltaY = event.pixelDelta.y
+                }
+                var step = (-deltaY / 120.0) * 24
+                var maxY = Math.max(0, flyLogFlick.contentHeight - flyLogFlick.height)
+                flyLogFlick.contentY = Math.max(0, Math.min(maxY, flyLogFlick.contentY + step))
+                event.accepted = true
+            }
+        }
 
         Flickable {
             id: flyLogFlick
