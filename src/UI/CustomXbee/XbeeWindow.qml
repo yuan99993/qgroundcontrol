@@ -8,9 +8,9 @@ import QGroundControl.Controls
 Window {
     id: root
     width: 250
-    height: 380
+    height: 320
     minimumWidth: 250
-    minimumHeight: 380
+    minimumHeight: 320
     title: "SEAD Control"
     visible: true
     color: "#1A1A1A"
@@ -383,9 +383,12 @@ Window {
             }
         }
 
+        //日志栏部分放在Fly界面去了，这里不做显示
         Rectangle {
             Layout.fillWidth: true
-            Layout.fillHeight: true
+            Layout.fillHeight: false        //让日志栏在这个窗口不再显示
+            Layout.preferredHeight: 0       //不再显示
+            visible: false                  //不再显示
             color: "black"
             radius: 2
             border.color: "#333"

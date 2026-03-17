@@ -1,0 +1,26 @@
+diff --git a/src/FlyView/FlyViewMap.qml b/src/FlyView/FlyViewMap.qml
+--- a/src/FlyView/FlyViewMap.qml
++++ b/src/FlyView/FlyViewMap.qml
+@@ -1076,6 +1076,23 @@ FlightMap {
+         color: "#CC000000"
+         border.color: "#333333"
+ 
++        WheelHandler {
++            id: flyLogWheel
++            target: null
++            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
++            onWheel: function(event) {
++                var deltaY = event.angleDelta.y
++                if (deltaY === 0 && event.pixelDelta) {
++                    deltaY = event.pixelDelta.y
++                }
++                var step = (-deltaY / 120.0) * 24
++                var maxY = Math.max(0, flyLogFlick.contentHeight - flyLogFlick.height)
++                flyLogFlick.contentY = Math.max(0, Math.min(maxY, flyLogFlick.contentY + step))
++                event.accepted = true
++            }
++        }
++
+         Flickable {
+             id: flyLogFlick
+             anchors.fill: parent

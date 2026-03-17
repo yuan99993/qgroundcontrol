@@ -1,4 +1,4 @@
-import QtQuick
+﻿import QtQuick
 import QtQuick.Controls
 import QtLocation
 import QtPositioning
@@ -40,6 +40,7 @@ FlightMap {
     property bool   _keepVehicleCentered:       pipMode ? true : false
     property bool   _saveZoomLevelSetting:      true
     property var    _airZonePolygons:           []      //新增禁飞区用
+    property string _seadLogText:               ">> Ready"  //日志栏显示用的字符串数据结构
 
     //禁飞区相关函数：把“各种格式的点列表”统一转换成地图可画的坐标路径
     function _toCoordPath(rawPath, closeLoop) {
@@ -97,6 +98,18 @@ FlightMap {
     //禁飞区函数：从后端拉最新禁飞区列表
     function _refreshAirZonePolygons() {
         _airZonePolygons = AirZonesBackend.qmlGetZonePolygons()
+    }
+
+    //日志框按行持续增长显示新日志
+    function _appendSeadLog(msg) {
+        if (!msg || msg.length === 0) {
+            return
+        }
+        if (_seadLogText.length === 0) {
+            _seadLogText = msg
+        } else {
+            _seadLogText = _seadLogText + "\n" + msg
+        }
     }
 
     function _adjustMapZoomForPipMode() {
@@ -1037,6 +1050,57 @@ FlightMap {
                     font.pixelSize: 10
                     color: "#FFFFFF"
                 }
+            }
+        }
+    }
+
+    Connections {
+        target: MissionControl
+        function onLogMessage(msg) {
+            _appendSeadLog(msg)
+            Qt.callLater(function() {
+                flyLogFlick.contentY = Math.max(0, flyLogText.contentHeight - flyLogFlick.height)
+            })
+        }
+    }
+
+    Rectangle {
+        id: flyLogPanel
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: ScreenTools.defaultFontPixelWidth * 0.8
+        anchors.bottomMargin: ScreenTools.defaultFontPixelHeight * 0.8
+        width: ScreenTools.defaultFontPixelWidth * 25
+        height: ScreenTools.defaultFontPixelHeight * 7
+        z: QGroundControl.zOrderTopMost
+        radius: 3
+        color: "#CC000000"
+        border.color: "#333333"
+
+        Flickable {
+            id: flyLogFlick
+            anchors.fill: parent
+            clip: true
+            contentWidth: width
+            contentHeight: flyLogText.contentHeight + 6
+            boundsBehavior: Flickable.StopAtBounds
+
+            ScrollBar.vertical: ScrollBar {
+                policy: ScrollBar.AsNeeded
+            }
+
+            TextEdit {
+                id: flyLogText
+                x: 4
+                y: 2
+                width: flyLogFlick.width - 8
+                text: _root._seadLogText
+                color: "#00FF00"
+                font.family: "Consolas"
+                font.pixelSize: 12
+                wrapMode: TextEdit.WrapAnywhere
+                readOnly: true
+                selectByMouse: true
             }
         }
     }
