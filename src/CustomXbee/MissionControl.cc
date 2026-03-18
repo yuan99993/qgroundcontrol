@@ -1,6 +1,7 @@
 #include "MissionControl.h"
 
 #include <algorithm>
+#include <QDataStream>
 #include <QNetworkDatagram>
 #include <QRegularExpression>
 #include <QSerialPortInfo>
@@ -353,6 +354,30 @@ void MissionControl::onSerialReadyRead()
 
 void MissionControl::processPacket(QByteArray data)
 {
+    if (data.size() >= 2 &&
+        static_cast<quint8>(data[0]) == static_cast<quint8>(ProtocolEnum::Time_Synchronize)) {
+        const int uid = static_cast<quint8>(data[1]);
+        if (uid > 0) {
+            const double t2 = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch() / 1000.0;
+            const double t3 = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch() / 1000.0;
+
+            QByteArray reply;
+            QDataStream stream(&reply, QIODevice::WriteOnly);
+            stream.setByteOrder(QDataStream::LittleEndian);
+            stream.setFloatingPointPrecision(QDataStream::DoublePrecision);
+            stream << static_cast<quint8>(ProtocolEnum::Time_Synchronize)
+                   << static_cast<quint8>(uid)
+                   << t2
+                   << t3;
+
+            if (_useXbee) {
+                sendPayload(uid, reply);
+            } else if (_udp->state() == QAbstractSocket::BoundState) {
+                _udp->writeDatagram(reply, _targetIp, _targetPort);
+            }
+        }
+        return;
+    }
     UavStatus st;
     if (PacketProtocol::parseUavStatus(data, st)) {
         const bool isNewUav = !_uavTable.contains(st.uav_id);
