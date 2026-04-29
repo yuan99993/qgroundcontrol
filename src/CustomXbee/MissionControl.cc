@@ -203,17 +203,12 @@ bool MissionControl::sendPayload(int targetID, QByteArray payload)
     if (targetID == 0) {
         sendList = _uavTable.keys();
         if (sendList.isEmpty()) {
-            if (_useXbee) {
-                sendList = _macTable.keys();
-                if (sendList.isEmpty()) {
-                    emit logMessage(">> Error: No XBee route configured. Add ID+MAC first.");
-                    return false;
-                }
-                emit logMessage(">> Warning: No active UAV telemetry, fallback to configured XBee routes.");
-            } else {
-                sendList.append(0);
-                emit logMessage(">> Warning: No active UAV telemetry, fallback to UAV ID 0.");
+            sendList = _macTable.keys();
+            if (sendList.isEmpty()) {
+                emit logMessage(">> Error: No active UAV telemetry and no XBee route configured. Add ID+MAC first.");
+                return false;
             }
+            emit logMessage(">> Warning: No active UAV telemetry, fallback to configured XBee routes.");
         }
     } else {
         if (_useXbee) {
@@ -223,8 +218,11 @@ bool MissionControl::sendPayload(int targetID, QByteArray payload)
             }
         } else {
             if (!_uavTable.contains(targetID)) {
-                emit logMessage(QString(">> Error: UAV %1 is not active.").arg(targetID));
-                return false;
+                if (!_uavTable.isEmpty() || !_macTable.contains(targetID)) {
+                    emit logMessage(QString(">> Error: UAV %1 is not active.").arg(targetID));
+                    return false;
+                }
+                emit logMessage(QString(">> Warning: UAV %1 has no active telemetry, fallback to configured XBee route ID.").arg(targetID));
             }
         }
         sendList.append(targetID);

@@ -1,6 +1,8 @@
 #include "SeadBackend.h"
 
 #include <QDataStream>
+#include <QList>
+#include <QVariant>
 #include <QVector>
 #include <cmath>
 #include <limits>
@@ -23,6 +25,18 @@ bool isOriginValid(double lat, double lng, double alt)  //用于判断原点经�
            std::isfinite(alt) &&
            lat >= -90.0 && lat <= 90.0 &&
            lng >= -180.0 && lng <= 180.0;
+}
+
+quint8 seadRoleForUavId(int uavId)
+{
+    const int remainder = ((uavId % 3) + 3) % 3;
+    if (remainder == 0) {
+        return 1; // Surveillance
+    }
+    if (remainder == 1) {
+        return 2; // Combat
+    }
+    return 3; // Munition
 }
 }
 
@@ -203,14 +217,47 @@ void SeadBackend::sendSeadMission()
         return;
     }
 
-    const QByteArray packet = _buildSeadMissionPacket(_targetUavId);
-    if (packet.isEmpty()) {
-        _log(">> Build SEAD mission packet failed.");
+    QList<int> targetIds;
+    if (_targetUavId > 0) {
+        targetIds.append(_targetUavId);
+    } else {
+        const QVariantList activeUavs = _missionControl->getActiveUavEnuStates();
+        for (const QVariant& item : activeUavs) {
+            const int id = item.toMap().value(QStringLiteral("id")).toInt();
+            if (id > 0 && !targetIds.contains(id)) {
+                targetIds.append(id);
+            }
+        }
+
+        if (targetIds.isEmpty()) {
+            const QVariantList routes = _missionControl->getXbeeRoutes();
+            for (const QVariant& item : routes) {
+                const int id = item.toMap().value(QStringLiteral("id")).toInt();
+                if (id > 0 && !targetIds.contains(id)) {
+                    targetIds.append(id);
+                }
+            }
+        }
+    }
+
+    if (targetIds.isEmpty()) {
+        _log(">> No target UAV available for SEAD mission.");
         return;
     }
 
-    if (_missionControl->sendCustomPayload(_targetUavId, packet, "SEAD_MISSION")) {
-        _log(QString(">> SEAD mission sent, targets=%1").arg(_missionPoints.count()));
+    bool allOk = true;
+    for (int id : targetIds) {
+        const QByteArray packet = _buildSeadMissionPacket(id);
+        if (packet.isEmpty()) {
+            _log(QString(">> Build SEAD mission packet failed for UAV %1.").arg(id));
+            allOk = false;
+            continue;
+        }
+        allOk = _missionControl->sendCustomPayload(id, packet, "SEAD_MISSION") && allOk;
+    }
+
+    if (allOk) {
+        _log(QString(">> SEAD mission sent, uavs=%1, Target quantity=%2").arg(targetIds.count()).arg(_missionPoints.count()));
     }
 }
 
@@ -284,12 +331,12 @@ QByteArray SeadBackend::_buildSeadMissionPacket(int targetId)
     QDataStream stream(&packet, QIODevice::WriteOnly);
     stream.setByteOrder(QDataStream::LittleEndian);
     const quint8 safeTargetId = static_cast<quint8>(qBound(0, targetId, 255));
-    const quint8 safeUavType = static_cast<quint8>(qBound(0, _seadUavType, 255));
+    const quint8 safeUavRoleType = seadRoleForUavId(targetId);
     const quint8 safeRadius = static_cast<quint8>(qBound(0, _waypointRadius, 255));
 
     stream << quint8(ProtocolEnum::SEAD_mission);
     stream << safeTargetId;
-    stream << safeUavType;
+    stream << safeUavRoleType;
     stream << qint32(qRound64(_seadVelocity * 1000.0));
     stream << qint32(qRound64(_seadRmin * 1000.0));
     stream << safeRadius;
