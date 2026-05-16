@@ -103,7 +103,7 @@ class PacketProtocol
     /**
      * @brief // 打包通用3字节指令: [msg_id, uav_id, param]，用于模式切换/解锁等简单命令。
      *
-     * @param uavID 目标无人机ID，0表示广播给所有无人机
+     * @param uavID 目标无人机ID
      * @param msgID 消息ID，参考 ProtocolEnum::Message_ID
      * @param param 参数值,即打包的命令数值
      * @return QByteArray

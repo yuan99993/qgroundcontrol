@@ -531,7 +531,7 @@ Window {
             TaskButton {
                 text: "OFFBOARD"
                 borderColor: accentBlue
-                onClicked: MissionControl.sendMode(0, "GUIDED")
+                onClicked: MissionControl.sendModeByRouteTable("GUIDED")
             }
             TaskButton {
                 text: "SEAD 下发"
@@ -541,7 +541,7 @@ Window {
             TaskButton {
                 text: "禁飞区下发"
                 borderColor: "#e67e22"
-                onClicked: AirZonesBackend.qmlUploadZones(SeadBackend.targetUavId)  //
+                onClicked: AirZonesBackend.qmlUploadZonesByRouteTable()
             }
             TaskButton {
                 text: "禁飞区保存"

@@ -46,6 +46,7 @@ public:
     Q_INVOKABLE bool qmlFinalizeCurrentZone() { return finalizeCurrentZone(); }
     Q_INVOKABLE void qmlClearAllZones() { clearAllZones(); }
     Q_INVOKABLE bool qmlUploadZones(int targetId) { return uploadZones(targetId); }
+    Q_INVOKABLE bool qmlUploadZonesByRouteTable() { return uploadZonesByRouteTable(); }
     Q_INVOKABLE QVariantList qmlGetZonePolygons() const { return zonePolygons(); }
 
     QmlObjectListModel* zonePoints() { return &_zonePoints; }  //给 QML 返回“点模型”（用于地图上画红色顶点点位）
@@ -56,6 +57,7 @@ public:
     bool finalizeCurrentZone();     //把草稿区保存成正式禁飞区（通常会分配 zoneId，并清空草稿）
     void clearAllZones();
     bool uploadZones(int targetId); //按协议下发禁飞区到指定 UAV（通常先清空，再分片发送每个区）
+    bool uploadZonesByRouteTable(); //按 MAC:ID 路由表逐机下发禁飞区
 
 signals:
     void zonesChanged();

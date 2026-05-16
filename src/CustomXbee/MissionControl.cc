@@ -252,40 +252,25 @@ bool MissionControl::sendPayload(int targetID, QByteArray payload)
         return false;
     }
 
-    if (targetID < 0) {
-        emit logMessage(">> Error: Invalid target ID.");
+    if (targetID <= 0) {
+        emit logMessage(">> Error: Invalid target ID. Use route-table send for multi-UAV commands.");
         return false;
     }
 
-    QList<int> sendList;
-    if (targetID == 0) {
-        sendList = _uavTable.keys();
-        if (sendList.isEmpty()) {
-            sendList = _macTable.keys();
-            if (sendList.isEmpty()) {
-                emit logMessage(">> Error: No active UAV telemetry and no XBee route configured. Add ID+MAC first.");
-                return false;
-            }
-            emit logMessage(">> Warning: No active UAV telemetry, fallback to configured XBee routes.");
+    if (_useXbee) {
+        if (!_macTable.contains(targetID)) {
+            emit logMessage(QString(">> Error: UAV %1 has no configured XBee route.").arg(targetID));
+            return false;
         }
     } else {
-        if (_useXbee) {
-            if (!_macTable.contains(targetID)) {
-                emit logMessage(QString(">> Error: UAV %1 has no configured XBee route.").arg(targetID));
-                return false;
-            }
-        } else {
-            if (!_uavTable.contains(targetID)) {
-                if (!_uavTable.isEmpty() || !_macTable.contains(targetID)) {
-                    emit logMessage(QString(">> Error: UAV %1 is not active.").arg(targetID));
-                    return false;
-                }
-                emit logMessage(QString(">> Warning: UAV %1 has no active telemetry, fallback to configured XBee route ID.").arg(targetID));
-            }
+        if (!_macTable.contains(targetID)) {
+            emit logMessage(QString(">> Error: UAV %1 has no configured route entry.").arg(targetID));
+            return false;
         }
-        sendList.append(targetID);
     }
 
+    QList<int> sendList;
+    sendList.append(targetID);
     std::sort(sendList.begin(), sendList.end());
 
     bool allOk = true;
@@ -371,6 +356,21 @@ void MissionControl::sendMode(int id, QString mode)
     if (sendPayload(id, pkt)) {
         _logCommandSent(QString("SET OFFBOARD"), id);
     }
+}
+
+bool MissionControl::sendModeByRouteTable(QString mode)
+{
+    int mEnum = ProtocolEnum::GUIDED;
+    if (mode == "LOITER") {
+        mEnum = ProtocolEnum::LOITER;
+    } else if (mode == "RTL") {
+        mEnum = ProtocolEnum::RTL;
+    } else if (mode == "LAND") {
+        mEnum = ProtocolEnum::LAND;
+    }
+
+    const QByteArray pkt = PacketProtocol::packCommand(0, ProtocolEnum::Mode_Change, mEnum);
+    return sendCustomPayloadByRouteTable(pkt, "SET OFFBOARD");
 }
 
 void MissionControl::onUdpReadyRead()
@@ -509,7 +509,7 @@ void MissionControl::_logCommandSent(const QString& commandLabel, int targetID)
     emit logMessage(
         QString("CMD [%1] -> UAV %2")
             .arg(commandLabel)
-            .arg(targetID == 0 ? "ALL" : QString::number(targetID))
+            .arg(QString::number(targetID))
     );
 }
 

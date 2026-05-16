@@ -32,6 +32,7 @@ public:
     Q_INVOKABLE void sendLand(int targetID);
     Q_INVOKABLE void sendRTL(int targetID);
     Q_INVOKABLE void sendMode(int targetID, QString modeName);
+    Q_INVOKABLE bool sendModeByRouteTable(QString modeName);
 
     Q_INVOKABLE bool setXbeeRoute(int uavId, const QString& macHex);    //前端可调用的设置ID对应的MAC地址表
     Q_INVOKABLE QString getXbeeRouteMac(int uavId) const;               //按 ID 查询 MAC
@@ -72,7 +73,7 @@ private:
     int                    _uavDataTimeoutMs = 3000;
 
     void initMacTable();
-    bool sendPayload(int targetID, QByteArray payload);     //真正发送函数（UDP/Xbee分支 + 多机分发 + fallback逻辑）。
+    bool sendPayload(int targetID, QByteArray payload);     //单机发送函数；多机发送统一走 sendCustomPayloadByRouteTable。
     void processPacket(QByteArray data);        //解析机载回传包：遥测更新状态表、文本消息写日志
     void _emitUavList();       //把内部 _uavTable 转成 QVariantList 发给 QML
     void _logCommandSent(const QString& commandLabel, int targetID);

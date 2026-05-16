@@ -55,15 +55,6 @@ void SeadBackend::setMissionControl(MissionControl* missionControl)
     _missionControl = missionControl;
 }
 
-void SeadBackend::setTargetUavId(int id)
-{
-    if (_targetUavId == id) {
-        return;
-    }
-    _targetUavId = id;
-    emit configChanged();
-}
-
 void SeadBackend::setSeadUavType(int type)
 {
     if (_seadUavType == type) {
@@ -152,13 +143,12 @@ void SeadBackend::insertTask(QGeoCoordinate coord)
         return;
     }
 
-    const QByteArray packet = _buildTaskInsertPacket(_targetUavId, coord, 0);
-    if (packet.isEmpty()) {
+    const QByteArray routePacket = _buildTaskInsertPacket(0, coord, 0);
+    if (routePacket.isEmpty()) {
         _log(">> Task_Insert packet build failed.");
         return;
     }
-
-    _missionControl->sendCustomPayload(_targetUavId, packet, "TASK_INSERT");
+    _missionControl->sendCustomPayloadByRouteTable(routePacket, "TASK_INSERT");
 }
 
 void SeadBackend::clearAllSeadPoints()
@@ -217,31 +207,10 @@ void SeadBackend::sendSeadMission()
         return;
     }
 
-    QList<int> targetIds;
-    if (_targetUavId > 0) {
-        targetIds.append(_targetUavId);
-    } else {
-        const QVariantList activeUavs = _missionControl->getActiveUavEnuStates();
-        for (const QVariant& item : activeUavs) {
-            const int id = item.toMap().value(QStringLiteral("id")).toInt();
-            if (id > 0 && !targetIds.contains(id)) {
-                targetIds.append(id);
-            }
-        }
-
-        if (targetIds.isEmpty()) {
-            const QVariantList routes = _missionControl->getXbeeRoutes();
-            for (const QVariant& item : routes) {
-                const int id = item.toMap().value(QStringLiteral("id")).toInt();
-                if (id > 0 && !targetIds.contains(id)) {
-                    targetIds.append(id);
-                }
-            }
-        }
-    }
+    const QList<int> targetIds = _missionControl->configuredRouteIds();
 
     if (targetIds.isEmpty()) {
-        _log(">> No target UAV available for SEAD mission.");
+        _log(">> No configured MAC:ID routes for SEAD mission.");
         return;
     }
 

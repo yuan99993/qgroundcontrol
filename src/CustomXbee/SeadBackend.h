@@ -34,7 +34,6 @@ class SeadBackend : public QObject
     Q_PROPERTY(QmlObjectListModel* insertPoints READ insertPoints CONSTANT)     //插入点
 
     // 配置参数
-    Q_PROPERTY(int targetUavId READ targetUavId WRITE setTargetUavId NOTIFY configChanged)  // 目标无人机ID，0表示广播给所有无人机
     Q_PROPERTY(int seadUavType READ seadUavType WRITE setSeadUavType NOTIFY configChanged)  // SEAD任务的飞机类型，1=旋翼，2=固定翼
     Q_PROPERTY(double seadVelocity READ seadVelocity WRITE setSeadVelocity NOTIFY configChanged)    // SEAD任务的飞行速度，单位m/s
     Q_PROPERTY(double seadRmin READ seadRmin WRITE setSeadRmin NOTIFY configChanged)                // SEAD任务的飞行半径，单位m
@@ -50,7 +49,6 @@ public:
     QmlObjectListModel* insertPoints() { return &_insertPoints; }   //插入点列表
 
     //获取配置参数的接口
-    int targetUavId() const { return _targetUavId; }
     int seadUavType() const { return _seadUavType; }
     double seadVelocity() const { return _seadVelocity; }
     double seadRmin() const { return _seadRmin; }
@@ -61,7 +59,6 @@ public:
 
     //修改配置参数的接口
     void setMissionControl(MissionControl* missionControl);
-    void setTargetUavId(int id);
     void setSeadUavType(int type);
     void setSeadVelocity(double velocity);
     void setSeadRmin(double rmin);
@@ -94,7 +91,6 @@ private:
     QmlObjectListModel _missionPoints;
     QmlObjectListModel _insertPoints;
 
-    int _targetUavId = 0;     // 0 = all active UAVs
     int _seadUavType = 2;
     double _seadVelocity = 18.0;
     double _seadRmin = 35.0;

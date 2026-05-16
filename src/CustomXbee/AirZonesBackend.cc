@@ -150,6 +150,64 @@ bool AirZonesBackend::uploadZones(int targetId)
     return allOk;
 }
 
+bool AirZonesBackend::uploadZonesByRouteTable()
+{
+    if (!_missionControl) {
+        _log(">> Airspace upload failed: MissionControl is null.");
+        return false;
+    }
+
+    if (!_hasValidOrigin()) {
+        _log(">> Airspace upload failed: origin is invalid.");
+        return false;
+    }
+
+    if (_zones.isEmpty()) {
+        _log(">> Airspace upload skipped: no saved zones.");
+        return false;
+    }
+    if (!_draftZoneVertices.isEmpty()) {
+        _log(">> Airspace upload note: current drawing zone is not saved, only saved zones will be uploaded.");
+    }
+
+    bool allOk = _missionControl->sendCustomPayloadByRouteTable(
+        PacketProtocol::packCommand(0, ProtocolEnum::Airspace_Clear, 0),
+        QString()
+    );
+    if (!allOk) {
+        _log(">> Airspace upload warning: clear command send failed.");
+    }
+
+    _log(QString(">> Airspace upload start: zones=%1 target=ROUTES")
+             .arg(_zones.size()));
+
+    for (const ZoneData& zone : _zones) {
+        QList<QByteArray> packets;
+        QString error;
+        if (!_buildZoneFragments(zone, 0, packets, error)) {
+            _log(QString(">> Zone %1 build failed: %2").arg(zone.zoneId).arg(error));
+            allOk = false;
+            continue;
+        }
+
+        bool zoneOk = true;
+        for (const QByteArray& pkt : packets) {
+            if (!_missionControl->sendCustomPayloadByRouteTable(pkt, QString())) {
+                zoneOk = false;
+                allOk = false;
+            }
+        }
+
+        _log(QString(">> Zone %1 upload %2: frags=%3 verts=%4")
+                 .arg(zone.zoneId)
+                 .arg(zoneOk ? "ok" : "failed")
+                 .arg(packets.size())
+                 .arg(zone.vertices.size()));
+    }
+
+    return allOk;
+}
+
 void AirZonesBackend::_log(const QString& msg) const
 {
     if (_missionControl) {
