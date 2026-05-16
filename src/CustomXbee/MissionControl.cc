@@ -118,6 +118,13 @@ QVariantList MissionControl::getActiveUavEnuStates() const
     return list;
 }
 
+QList<int> MissionControl::configuredRouteIds() const
+{
+    QList<int> keys = _macTable.keys();
+    std::sort(keys.begin(), keys.end());
+    return keys;
+}
+
 void MissionControl::connectUdp(QString ip, int port)
 {
     disconnectAll();
@@ -185,6 +192,57 @@ bool MissionControl::sendCustomPayload(int targetID, const QByteArray& payload, 
         _logCommandSent(commandLabel, targetID);
     }
     return ok;
+}
+
+bool MissionControl::sendCustomPayloadByRouteTable(const QByteArray& payload, const QString& commandLabel)
+{
+    if (!isConnected()) {
+        emit logMessage(">> Error: Not Connected!");
+        return false;
+    }
+
+    const QList<int> routeIds = configuredRouteIds();
+    if (routeIds.isEmpty()) {
+        emit logMessage(">> Error: No configured MAC:ID routes.");
+        return false;
+    }
+
+    bool allOk = true;
+    QStringList sentIds;
+    for (int id : routeIds) {
+        QByteArray packet = payload;
+        if (packet.size() >= 2) {
+            packet[1] = static_cast<char>(id);
+        }
+
+        bool sent = false;
+        if (_useXbee) {
+            const QByteArray mac = _macTable.value(id, QByteArray());
+            if (mac.size() != 8) {
+                emit logMessage(QString(">> Error: Missing/invalid XBee route for UAV %1.").arg(id));
+                allOk = false;
+                continue;
+            }
+            const QByteArray frame = PacketProtocol::wrapXbeeApiFrame(mac, packet);
+            sent = _serial->write(frame) >= 0;
+        } else {
+            sent = _udp->writeDatagram(packet, _targetIp, _targetPort) >= 0;
+        }
+
+        if (!sent) {
+            allOk = false;
+            emit logMessage(QString(">> Error: Route-table send failed for UAV %1.").arg(id));
+            continue;
+        }
+
+        sentIds << QString::number(id);
+    }
+
+    if (allOk && !commandLabel.isEmpty()) {
+        emit logMessage(QString("CMD [%1] -> ROUTES [%2]").arg(commandLabel, sentIds.join(", ")));
+    }
+
+    return allOk;
 }
 
 bool MissionControl::sendPayload(int targetID, QByteArray payload)

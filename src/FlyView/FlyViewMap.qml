@@ -914,11 +914,11 @@ FlightMap {
         }
 
         QGCMenuItem {
-            text: "插入 SEAD 任务点"
+            text: "设置SEAD任务点"
             onTriggered: SeadBackend.addSeadPoint(seadContextMenu.clickCoordinate)
         }
         QGCMenuItem {
-            text: "中途插入任务点"
+            text: "插入任务点"
             onTriggered: SeadBackend.insertTask(seadContextMenu.clickCoordinate)
         }
         QGCMenuItem {
@@ -926,13 +926,17 @@ FlightMap {
             onTriggered: AirZonesBackend.qmlAddZoneVertex(seadContextMenu.clickCoordinate)
         }
         QGCMenuItem {
-            text: "增加VRP目标点"
+            text: "设置VRP目标点"
             onTriggered: VrpBackend.addVrpPointWithAlt(seadContextMenu.clickCoordinate, VrpBackend.draftPointAlt)
+        }
+        QGCMenuItem {
+            text: "设置集合点"
+            onTriggered: FormationBackend.addRallyPoint(seadContextMenu.clickCoordinate)
         }
         QGCMenuSeparator { }
         QGCMenuItem {
             text: "清除所有点位"
-            onTriggered: { SeadBackend.clearAllSeadPoints();/*SEAD点清理*/ AirZonesBackend.qmlClearAllZones(); /*禁飞区清理*/ VrpBackend.clearAllVrpPoints();}
+            onTriggered: { SeadBackend.clearAllSeadPoints();/*SEAD点清理*/ AirZonesBackend.qmlClearAllZones(); /*禁飞区清理*/ VrpBackend.clearAllVrpPoints(); FormationBackend.clearRallyPoints();}
         }
     }
 
@@ -986,6 +990,25 @@ FlightMap {
                     text: (typeof index !== "undefined") ? String(index + 1) : "?"
                     anchors.centerIn: parent
                     font.pixelSize: 10
+                    color: "black"
+                }
+            }
+        }
+    }
+
+    // --- 编队集合点 (橙色) ---
+    MapItemView {
+        model: FormationBackend.rallyPoints
+        delegate: MapQuickItem {
+            coordinate:     object.coordinate
+            anchorPoint:    Qt.point(sourceItem.width/2, sourceItem.height/2)
+            z:              QGroundControl.zOrderMapItems + 1
+            sourceItem: Rectangle {
+                width: 22; height: 22; color: "#ff9f1c"; radius: 11; border.color: "white"
+                QGCLabel {
+                    text: "R"
+                    anchors.centerIn: parent
+                    font.pixelSize: 11
                     color: "black"
                 }
             }

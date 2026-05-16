@@ -137,13 +137,16 @@ bool VrpBackend::runVrpAllocation()
     for (int i = 0; i < targetCount; ++i) {
         const QGeoCoordinate& coord = _targets[i];
         const double relAlt = (i < _targetRelAlts.size() && std::isfinite(_targetRelAlts[i])) ? _targetRelAlts[i] : 0.0;
-        const QGeoCoordinate coordWithAbsAlt(coord.latitude(), coord.longitude(), _originAlt + relAlt);
+        // 目标点的平面位置来自地图，经纬度转 ENU；高度则直接采用用户输入的相对高度。
+        // 这样文本框里填 10m，机载端收到的 U 就严格是 10m，不混入同高点投影到 ENU 切平面时的微小曲率偏差。
+        const QGeoCoordinate coordAtOriginAlt(coord.latitude(), coord.longitude(), _originAlt);
 
         ProtocolPointENU enu {0.0, 0.0, 0.0};
-        if (!PacketProtocol::coordToEnu(coordWithAbsAlt, _originLat, _originLng, _originAlt, enu)) {
+        if (!PacketProtocol::coordToEnu(coordAtOriginAlt, _originLat, _originLng, _originAlt, enu)) {
             _log(">> VRP allocate failed: coordToEnu failed.");
             return false;
         }
+        enu.u = relAlt;
         targetsEnu.push_back(enu);
     }
 

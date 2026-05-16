@@ -27,6 +27,9 @@ enum Message_ID {
     Airspace_ZoneFrag = 21,
     Airspace_ZoneRemove = 22,
     Airspace_Ack = 23,
+    Swarm_Command = 24,
+    Formation_State = 25,
+    Formation_Point = 26,
     info = 44           // 文本消息
 };
 
@@ -112,6 +115,25 @@ class PacketProtocol
 
         // 打包单点引导任务: [Waypoints, uav_id, method, radius, E, N, U]，ENU按毫米(int32)发送。
     static QByteArray packGuidedPoint(int uavID, double e, double n, double u, int radius);
+
+        // 打包编队参数: [Swarm_Command, uav_id, enable, shape, leader_id, spacing, standoff, safe_sep, alt_step, desired_target_time]。
+    static QByteArray packSwarmCommand(int uavID,
+                                       bool enable,
+                                       int shape,
+                                       int leaderId,
+                                       double spacing,
+                                       double standoffDistance,
+                                       double safeSeparation,
+                                       double altitudeStep,
+                                       double desiredTargetTime);
+
+        // 打包编队集合点: [Formation_Point, uav_id, point_id, E, N, U, loiter_radius]，ENU与半径按毫米(int32)发送。
+    static QByteArray packFormationPoint(int uavID,
+                                         quint16 pointId,
+                                         double e,
+                                         double n,
+                                         double u,
+                                         double loiterRadius);
 
         // 将业务payload封装为XBee API Tx帧(0x10)，补齐长度和校验和后可直接串口发送。
     static QByteArray wrapXbeeApiFrame(QByteArray destMac, QByteArray payload);

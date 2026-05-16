@@ -68,6 +68,55 @@ QByteArray PacketProtocol::packGuidedPoint(int uavID, double e, double n, double
     return packet;
 }
 
+QByteArray PacketProtocol::packSwarmCommand(int uavID,
+                                            bool enable,
+                                            int shape,
+                                            int leaderId,
+                                            double spacing,
+                                            double standoffDistance,
+                                            double safeSeparation,
+                                            double altitudeStep,
+                                            double desiredTargetTime)
+{
+    QByteArray packet;
+    QDataStream stream(&packet, QIODevice::WriteOnly);
+    stream.setByteOrder(QDataStream::LittleEndian);
+    stream.setFloatingPointPrecision(QDataStream::DoublePrecision);
+
+    stream << quint8(ProtocolEnum::Swarm_Command);
+    stream << quint8(qBound(0, uavID, 255));
+    stream << quint8(enable ? 1 : 0);
+    stream << quint8(qBound(0, shape, 255));
+    stream << quint8(qBound(0, leaderId, 255));
+    stream << qint32(qRound64(spacing * 1000.0));
+    stream << qint32(qRound64(standoffDistance * 1000.0));
+    stream << qint32(qRound64(safeSeparation * 1000.0));
+    stream << qint32(qRound64(altitudeStep * 1000.0));
+    stream << double(desiredTargetTime);
+    return packet;
+}
+
+QByteArray PacketProtocol::packFormationPoint(int uavID,
+                                              quint16 pointId,
+                                              double e,
+                                              double n,
+                                              double u,
+                                              double loiterRadius)
+{
+    QByteArray packet;
+    QDataStream stream(&packet, QIODevice::WriteOnly);
+    stream.setByteOrder(QDataStream::LittleEndian);
+
+    stream << quint8(ProtocolEnum::Formation_Point);
+    stream << quint8(qBound(0, uavID, 255));
+    stream << quint16(pointId);
+    stream << qint32(qRound64(e * 1000.0));
+    stream << qint32(qRound64(n * 1000.0));
+    stream << qint32(qRound64(u * 1000.0));
+    stream << qint32(qRound64(loiterRadius * 1000.0));
+    return packet;
+}
+
 QByteArray PacketProtocol::wrapXbeeApiFrame(QByteArray destMac, QByteArray payload)
 {
     QByteArray frameData;

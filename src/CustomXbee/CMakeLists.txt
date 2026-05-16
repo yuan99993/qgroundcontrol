@@ -5,6 +5,8 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     packetprotocol.h
     AirZonesBackend.cc
     AirZonesBackend.h
+    FormationBackend.cc
+    FormationBackend.h
     SeadBackend.cc
     SeadBackend.h
     VrpBackend.cc

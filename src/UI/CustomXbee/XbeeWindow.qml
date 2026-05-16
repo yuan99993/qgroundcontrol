@@ -8,9 +8,9 @@ import QGroundControl.Controls
 Window {
     id: root
     width: 250
-    height: 320
+    height: 390
     minimumWidth: 250
-    minimumHeight: 320
+    minimumHeight: 390
     title: "SEAD Control"
     visible: true
     color: "#1A1A1A"
@@ -56,6 +56,33 @@ Window {
         }
 
         SeadBackend.waypointRadius = radius
+        return true
+    }
+
+    function applyFormationInputs() {
+        const leaderId = Number(txtFormationLeaderId.text)
+        const spacing = Number(txtFormationSpacing.text)
+        const safeSep = Number(txtFormationSafeSep.text)
+        const loiterRadius = Number(txtFormationLoiterRadius.text)
+
+        if (!Number.isInteger(leaderId) || leaderId < 0 || leaderId > 255) {
+            return false
+        }
+        if (!isFinite(spacing) || spacing <= 0) {
+            return false
+        }
+        if (!isFinite(safeSep) || safeSep <= 0) {
+            return false
+        }
+        if (!isFinite(loiterRadius) || loiterRadius <= 0) {
+            return false
+        }
+
+        FormationBackend.leaderId = leaderId
+        FormationBackend.spacing = spacing
+        FormationBackend.safeSeparation = safeSep
+        FormationBackend.loiterRadius = loiterRadius
+        FormationBackend.shape = formationShapeSelector.currentValue
         return true
     }
 
@@ -352,6 +379,119 @@ Window {
                         onEditingFinished: {
                             if (!root.applyWaypointRadiusInput()) {
                                 txtWaypointRadius.text = String(SeadBackend.waypointRadius)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 66
+            color: "#252525"
+            radius: 2
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 2
+                spacing: 3
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 3
+
+                    Text { text: "Leader:"; color: "#aaa"; font.pointSize: 8 }
+                    TextField {
+                        id: txtFormationLeaderId
+                        text: String(FormationBackend.leaderId)
+                        placeholderText: "ID"
+                        Layout.preferredWidth: 40
+                        Layout.preferredHeight: 25
+                        font.pointSize: 8
+                        leftPadding: 4
+                        validator: IntValidator { bottom: 0; top: 255 }
+                        onTextChanged: root.applyFormationInputs()
+                        onEditingFinished: {
+                            if (!root.applyFormationInputs()) {
+                                txtFormationLeaderId.text = String(FormationBackend.leaderId)
+                            }
+                        }
+                    }
+
+                    Text { text: "Shape:"; color: "#aaa"; font.pointSize: 8 }
+                    ComboBox {
+                        id: formationShapeSelector
+                        textRole: "text"
+                        valueRole: "value"
+                        model: [
+                            { text: "VEE", value: 1 },
+                            { text: "ECHELON_L", value: 2 },
+                            { text: "ECHELON_R", value: 3 },
+                            { text: "TRAIL", value: 4 },
+                            { text: "TRIANGLE", value: 5 },
+                            { text: "WEDGE_WIDE", value: 6 },
+                            { text: "ARROW", value: 7 },
+                            { text: "INVERTED_V", value: 8 }
+                        ]
+                        currentIndex: 3
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 25
+                        font.pointSize: 8
+                        onActivated: root.applyFormationInputs()
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 3
+
+                    Text { text: "Spacing:"; color: "#aaa"; font.pointSize: 8 }
+                    TextField {
+                        id: txtFormationSpacing
+                        text: Number(FormationBackend.spacing).toFixed(1)
+                        placeholderText: "m"
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 25
+                        font.pointSize: 8
+                        leftPadding: 4
+                        onTextChanged: root.applyFormationInputs()
+                        onEditingFinished: {
+                            if (!root.applyFormationInputs()) {
+                                txtFormationSpacing.text = Number(FormationBackend.spacing).toFixed(1)
+                            }
+                        }
+                    }
+
+                    Text { text: "Safe:"; color: "#aaa"; font.pointSize: 8 }
+                    TextField {
+                        id: txtFormationSafeSep
+                        text: Number(FormationBackend.safeSeparation).toFixed(1)
+                        placeholderText: "m"
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 25
+                        font.pointSize: 8
+                        leftPadding: 4
+                        onTextChanged: root.applyFormationInputs()
+                        onEditingFinished: {
+                            if (!root.applyFormationInputs()) {
+                                txtFormationSafeSep.text = Number(FormationBackend.safeSeparation).toFixed(1)
+                            }
+                        }
+                    }
+
+                    Text { text: "Loiter:"; color: "#aaa"; font.pointSize: 8 }
+                    TextField {
+                        id: txtFormationLoiterRadius
+                        text: Number(FormationBackend.loiterRadius).toFixed(1)
+                        placeholderText: "m"
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 25
+                        font.pointSize: 8
+                        leftPadding: 4
+                        onTextChanged: root.applyFormationInputs()
+                        onEditingFinished: {
+                            if (!root.applyFormationInputs()) {
+                                txtFormationLoiterRadius.text = Number(FormationBackend.loiterRadius).toFixed(1)
                             }
                         }
                     }

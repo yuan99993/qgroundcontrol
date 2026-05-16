@@ -40,7 +40,9 @@ public:
 
     bool isConnected() const;       //返回当前链路是否连上（UDP是否连接或者Xbee是否连上）
     int activeUavCount() const { return _uavTable.size(); }     //返回当前在线无人机数量
+    QList<int> configuredRouteIds() const;                              //返回当前 MAC:ID 路由表中配置的 UAV ID
     bool sendCustomPayload(int targetID, const QByteArray& payload, const QString& commandLabel = QString());
+    bool sendCustomPayloadByRouteTable(const QByteArray& payload, const QString& commandLabel = QString());
     Q_INVOKABLE void appendLogMessage(const QString& msg);
 
 signals:
