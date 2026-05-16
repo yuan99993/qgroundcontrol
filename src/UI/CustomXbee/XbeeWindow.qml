@@ -11,7 +11,7 @@ Window {
     height: 390
     minimumWidth: 250
     minimumHeight: 390
-    title: "SEAD Control"
+    title: "Task allocation"
     visible: true
     color: "#1A1A1A"
 
@@ -294,7 +294,7 @@ Window {
                 TextField {
                     id: txtOriginLat
                     text: isFinite(SeadBackend.originLat) ? SeadBackend.originLat.toFixed(6) : ""
-                    placeholderText: "lat"
+                    placeholderText: "LAT"
                     Layout.preferredWidth: 55
                     Layout.preferredHeight: 25
                     font.pointSize: 8
@@ -304,7 +304,7 @@ Window {
                 TextField {
                     id: txtOriginLng
                     text: isFinite(SeadBackend.originLng) ? SeadBackend.originLng.toFixed(6) : ""
-                    placeholderText: "lng"
+                    placeholderText: "LON"
                     Layout.preferredWidth: 55
                     Layout.preferredHeight: 25
                     font.pointSize: 8
@@ -314,7 +314,7 @@ Window {
                 TextField {
                     id: txtOriginAlt
                     text: isFinite(SeadBackend.originAlt) ? SeadBackend.originAlt.toFixed(1) : ""
-                    placeholderText: "alt"
+                    placeholderText: "ALT"
                     Layout.preferredWidth: 35
                     Layout.preferredHeight: 25
                     font.pointSize: 8
